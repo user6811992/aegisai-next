@@ -1,7 +1,5 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 
 export default function App() {
   const [version, setVersion] = useState('...');
@@ -245,7 +243,7 @@ export default function App() {
                   <span>{m.role}</span>
                   {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
                 </div>
-                <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(m.content || '')) }} />
+                <div class="text-sm text-gray-100 whitespace-pre-wrap">{m.content}</div>
               </div>
             ))}
             {busy && <div class="text-sm text-gray-400">Thinking…</div>}
