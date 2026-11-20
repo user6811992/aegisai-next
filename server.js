@@ -412,6 +412,50 @@ const server = http.createServer(async (req, res) => {
       const st = await integrations.registry.statusAll();
       return json(res, 200, { ok: !!found, binary: found, log: log.slice(-1000), status: st.craft });
     }
+    if (url === '/api/integrations/ghidra/install-mcp' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const ghidra = require('./server/integrations/ghidra');
+      const installDir = ghidra.findGhidraInstall();
+      if (!installDir) {
+        const st = await integrations.registry.statusAll();
+        return json(res, 200, { ok: false, error: 'Ghidra not found. Install Ghidra first (https://ghidra-sre.org).', status: st.ghidra });
+      }
+      const https = require('https');
+      const fs = require('fs');
+      const path = require('path');
+      const extDir = path.join(installDir, 'Extensions');
+      fs.mkdirSync(extDir, { recursive: true });
+      const candidates = [
+        'https://github.com/symgraph/GhidrAssistMCP/releases/latest/download/GhidrAssistMCP.zip',
+        'https://github.com/symgraph/GhidrAssistMCP/releases/latest/download/GhidrAssistMCP.jar',
+      ];
+      let ok = false, dest = null;
+      for (const u of candidates) {
+        dest = path.join(extDir, path.basename(u));
+        try {
+          const success = await new Promise((resolve) => {
+            const file = fs.createWriteStream(dest);
+            https.get(u, { headers: { 'User-Agent': 'AegisAI' } }, (res) => {
+              if (res.statusCode !== 200) { file.close(); fs.unlink(dest, () => {}); resolve(false); return; }
+              res.pipe(file);
+              file.on('finish', () => { file.close(); resolve(true); });
+            }).on('error', () => { file.close(); fs.unlink(dest, () => {}); resolve(false); });
+          });
+          if (success) { ok = true; break; }
+        } catch (e) {}
+      }
+      const st = await integrations.registry.statusAll();
+      return json(res, 200, { ok, file: dest, error: ok ? null : 'No downloadable asset found. Visit https://github.com/symgraph/GhidrAssistMCP/releases manually.', status: st.ghidra });
+    }
+    if (url === '/api/integrations/ghidra/detect' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const ghidra = require('./server/integrations/ghidra');
+      ghidra.resetCache();
+      const url2 = await ghidra.detectMcpUrl();
+      if (url2) { process.env.GHIDRA_MCP_URL = url2; ghidra.cachedUrl = url2; }
+      const st = await integrations.registry.statusAll();
+      return json(res, 200, { ok: !!url2, url: url2, status: st.ghidra });
+    }
     if (url === '/api/integrations/rea/update' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const { runProcess } = require('./server/core/security');

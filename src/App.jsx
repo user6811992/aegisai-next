@@ -235,8 +235,13 @@ export default function App() {
                   {name === 'awesome-re' && (
                     <button class="text-xs text-blue-400 ml-2 mt-1 cursor-pointer hover:underline" onClick={async () => { const r = await fetch('/api/integrations/awesome-re/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Index updated: ' + d.count + ' entries') : ('Update failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update index</button>
                   )}
-                  {name === 'ghidra' && !s.ready && (
-                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Ghidra MCP URL (e.g. http://127.0.0.1:8089):'); if (v) { await fetch('/api/integrations/ghidra/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'GHIDRA_MCP_URL', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); } }}>Configure</button>
+                  {name === 'ghidra' && (
+                    <>
+                      {!s.ready && <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Ghidra MCP URL (e.g. http://127.0.0.1:8089):'); if (v) { await fetch('/api/integrations/ghidra/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'GHIDRA_MCP_URL', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); } }}>Configure</button>}
+                      <button class="text-xs text-green-400 ml-2 mt-1" onClick={async () => { const r = await fetch('/api/integrations/ghidra/install-mcp', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Extension downloaded: ' + d.file) : ('Failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Install GhidrAssistMCP</button>
+                      <button class="text-xs text-yellow-400 ml-2 mt-1" onClick={async () => { const r = await fetch('/api/integrations/ghidra/detect', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Detected MCP at ' + d.url) : 'No Ghidra MCP detected. Open Ghidra and enable the extension.'); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Detect MCP</button>
+                      {s.installDir && <div class="text-xs text-gray-500 ml-2">Ghidra: {s.installDir}</div>}
+                    </>
                   )}
                   {name === 'craft' && !s.ready && (
                     <>
