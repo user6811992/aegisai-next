@@ -83,8 +83,17 @@ async function runAgent(opts) {
     try {
       resp = await backends.backendChat({ model, messages: msgs, tools, stream: false }, (e) => onEvent(e));
     } catch (e) {
-      onEvent({ type: 'error', message: String(e.message || e) });
-      return { final: { type: 'done', final: 'error: ' + (e.message || e), toolLog }, toolLog };
+      // Retry without tools (vision models like moondream don't support tool calls)
+      if (tools && tools.length > 0) {
+        try {
+          tools = [];
+          resp = await backends.backendChat({ model, messages: msgs, tools: [], stream: false }, (e) => onEvent(e));
+        } catch (e2) {
+          return { final: { type: 'done', final: 'error: ' + (e2.message || e2), toolLog }, toolLog };
+        }
+      } else {
+        return { final: { type: 'done', final: 'error: ' + (e.message || e), toolLog }, toolLog };
+      }
     }
     const data = resp && resp.data ? resp.data : resp;
     const msg = (data && data.message) || {};
