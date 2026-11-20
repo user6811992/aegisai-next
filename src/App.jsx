@@ -433,6 +433,17 @@ export default function App() {
               <div>Backend: <span class="text-gray-200">{(integrations._backend || {}).type || 'loading…'}</span> at <span class="text-gray-200">{(integrations._backend || {}).url || ''}</span></div>
             </div>
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
+              <label>Search engine:</label>
+              <select class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" id="searchEngine" defaultValue="duckduckgo" onChange={async (e) => { await fetch('/api/search-config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ engine: e.target.value }) }); }}>
+                <option value="duckduckgo">DuckDuckGo</option>
+                <option value="wikipedia">Wikipedia</option>
+                <option value="searxng">SearXNG</option>
+                <option value="google-html">Google</option>
+                <option value="internet-archive">Internet Archive</option>
+                <option value="langsearch">LangSearch</option>
+              </select>
+            </div>
+            <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
               <select class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" id="backendType" defaultValue={(integrations._backend || {}).type || 'ollama'}>
                 <option value="ollama">ollama</option>
                 <option value="llamacpp">llamacpp</option>

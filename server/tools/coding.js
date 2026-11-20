@@ -77,22 +77,9 @@ async function execCodingTool(name, args, projectRoot) {
       return r;
     }
     case 'web_search': {
-      const q = encodeURIComponent(a.query || '');
-      try {
-        const r = await fetch('https://html.duckduckgo.com/html/?q=' + q);
-        const html = await r.text();
-        const results = [];
-        const re = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/g;
-        let m;
-        while ((m = re.exec(html)) && results.length < (a.limit || 8)) {
-          const url = m[1];
-          const title = m[2].replace(/<[^>]*>/g, '').trim();
-          results.push(title + ' — ' + url);
-        }
-        return { ok: true, output: results.join('\\n') || '(no results)' };
-      } catch (e) {
-        return { ok: false, output: String(e.message || e) };
-      }
+      const search = require('./search');
+      const result = await search.webSearch(a.query || '', { max_results: a.max_results || a.limit || 8 });
+      return { ok: true, output: result };
     }
     default:
       return { ok: false, output: 'unknown tool: ' + name };

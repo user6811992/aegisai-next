@@ -519,6 +519,20 @@ const server = http.createServer(async (req, res) => {
       try { return json(res, 200, { content: fs.readFileSync(p, 'utf8') }); }
       catch (e) { return json(res, 200, { content: '' }); }
     }
+    if (url === '/api/search-config' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const s = require('./server/tools/search');
+      return json(res, 200, s.loadConfig());
+    }
+    if (url === '/api/search-config' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const s = require('./server/tools/search');
+      const cfg = s.loadConfig();
+      Object.assign(cfg, body);
+      s.saveConfig(cfg);
+      return json(res, 200, { ok: true, config: cfg });
+    }
     if (url === '/api/rag/reindex' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
