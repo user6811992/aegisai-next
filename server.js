@@ -311,21 +311,74 @@ const server = http.createServer(async (req, res) => {
       const st = await integrations.registry.statusAll();
       return json(res, 200, { ok: !!data, count: data ? data.length : 0, status: st['awesome-re'] });
     }
+    if (url === '/api/integrations/craft/install-rust' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const https = require('https');
+      const fs = require('fs');
+      const path = require('path');
+      const { runProcess } = require('./server/core/security');
+      const rustupPath = path.join(DATA_DIR, 'rustup-init.exe');
+      try {
+        if (!fs.existsSync(rustupPath)) {
+          await new Promise((resolve, reject) => {
+            const file = fs.createWriteStream(rustupPath);
+            https.get('https://win.rustup.rs/x86_64', (res) => {
+              res.pipe(file);
+              file.on('finish', () => { file.close(); resolve(); });
+            }).on('error', (e) => { fs.unlink(rustupPath, () => {}); reject(e); });
+          });
+        }
+        const r = await runProcess(rustupPath, ['-y', '--default-toolchain', 'stable'], { timeout: 600000, shell: true });
+        return json(res, 200, { ok: r.ok, output: (r.out || '').slice(-500), error: r.err });
+      } catch (e) {
+        return json(res, 500, { ok: false, error: String(e.message || e) });
+      }
+    }
     if (url === '/api/integrations/craft/install' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const { runProcess } = require('./server/core/security');
       const fs = require('fs');
       const path = require('path');
-      const { DATA_DIR } = require('./server/core/config');
       const dir = path.join(DATA_DIR, 'tools', 'craft-anything');
       const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
       const gitBin = process.platform === 'win32' ? 'git.exe' : 'git';
       const cargoBin = process.platform === 'win32' ? 'cargo.exe' : 'cargo';
       // check cargo
+      const https = require('https');
+      const binDir = path.join(DATA_DIR, 'tools');
+      fs.mkdirSync(binDir, { recursive: true });
+      // Try pre-built binary from GitHub releases first
+      const candidates = [
+        'https://github.com/storytold/craft-anything/releases/latest/download/craft-anything-cli-x86_64-pc-windows-msvc.exe',
+        'https://github.com/storytold/craft-anything/releases/latest/download/craft.exe',
+        'https://github.com/storytold/craft-anything/releases/latest/download/craft-anything-cli.exe',
+      ];
+      for (const url of candidates) {
+        try {
+          const dest = path.join(binDir, 'craft-anything-cli.exe');
+          const ok = await new Promise((resolve) => {
+            const file = fs.createWriteStream(dest);
+            https.get(url, { headers: { 'User-Agent': 'AegisAI' } }, (res) => {
+              if (res.statusCode !== 200) { file.close(); fs.unlink(dest, () => {}); resolve(false); return; }
+              res.pipe(file);
+              file.on('finish', () => { file.close(); resolve(true); });
+            }).on('error', () => { file.close(); fs.unlink(dest, () => {}); resolve(false); });
+          });
+          if (ok && fs.existsSync(dest)) {
+            const cfg = intConfig.load();
+            cfg.CRAFT_BIN = dest;
+            intConfig.save(cfg);
+            intConfig.apply({ CRAFT_BIN: dest });
+            const st = await integrations.registry.statusAll();
+            return json(res, 200, { ok: true, binary: dest, status: st.craft });
+          }
+        } catch (e) {}
+      }
+      // Fall back to cargo build
       const cargoCheck = await runProcess(cargoBin, ['--version'], { timeout: 10000, shell: true });
       if (!cargoCheck.ok) {
         const st = await integrations.registry.statusAll();
-        return json(res, 200, { ok: false, error: 'Rust/cargo is not installed. Install from https://rustup.rs then retry.', status: st.craft });
+        return json(res, 200, { ok: false, error: 'No pre-built binary found and Rust/cargo is not installed. Install Rust from https://rustup.rs (or click "Install Rust") then retry.', status: st.craft });
       }
       let log = '';
       if (!fs.existsSync(dir)) {
