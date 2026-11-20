@@ -29,6 +29,8 @@ export default function App() {
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillCode, setNewSkillCode] = useState('');
   const [chatId, setChatId] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [parentId, setParentId] = useState(null);
 
   const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
   const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
@@ -93,6 +95,12 @@ export default function App() {
       setMessages([...next, { ...assistant }]);
     } finally {
       setBusy(false);
+      // auto-save chat
+      try {
+        const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Chat', messages: [...next, assistant] }) });
+        const d = await r.json();
+        if (d.id) setChatId(d.id);
+      } catch (e) {}
     }
   }
 
@@ -112,6 +120,27 @@ export default function App() {
       const cd = await cr.json();
       setMessages(cd.messages || []);
       setChatId(d.id);
+    }
+  }
+
+  async function loadBranches() {
+    if (!chatId) return;
+    try {
+      const r = await fetch('/api/chats/branches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) });
+      const d = await r.json();
+      setBranches(d.branches || []);
+    } catch (e) { setBranches([]); }
+  }
+
+  async function navigateParent() {
+    if (!chatId) return;
+    const chat = await (await fetch('/api/chats/' + chatId)).json();
+    if (chat.parent_id) {
+      const pr = await fetch('/api/chats/' + chat.parent_id);
+      const pd = await pr.json();
+      setMessages(pd.messages || []);
+      setChatId(chat.parent_id);
+      setBranches([]);
     }
   }
 
@@ -191,11 +220,21 @@ export default function App() {
 
       {tab === 'chat' && (
         <>
+          {branches.length > 0 && (
+            <div class="px-4 py-1 flex gap-2 text-xs flex-wrap">
+              {branches.map((b) => (
+                <button key={b.id} class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/chats/' + b.id); const d = await r.json(); setMessages(d.messages || []); setChatId(b.id); setBranches([]); }}>{b.title}</button>
+              ))}
+            </div>
+          )}
           <div class="px-4 py-1 flex gap-2 text-xs items-center">
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={navigateParent}>Parent</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={loadBranches}>Branches</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-red-400 hover:bg-gray-700" onClick={async () => { if (!chatId) { await saveChat(); } if (chatId && confirm('Delete this chat?')) { await fetch('/api/chats/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) }); setMessages([]); setChatId(null); } }}>Delete</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const blob = new Blob([JSON.stringify({ title: 'Chat', messages }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'chat.json'; a.click(); URL.revokeObjectURL(url); }}>Export</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const u = prompt('URL or text to squeeze:'); if (!u) return; const q = prompt('Question:'); if (!q) return; const r = await fetch('/api/squeeze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u, question: q, model }) }); const d = await r.json(); if (d.ok) { setInput((prev) => (prev + '\\n' + d.answer).trim()); } else { alert('Squeeze failed: ' + (d.error || 'unknown')); } }}>Squeeze</button>
           </div>
           <main class="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
             {messages.map((m, i) => (
@@ -230,6 +269,7 @@ export default function App() {
           <div class="flex gap-2">
             <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={newMemory} onInput={(e) => setNewMemory(e.target.value)} placeholder="New memory…" />
             <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={addMemory}>Add</button>
+            <button class="border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { if (messages.length === 0) { alert('No chat to extract from'); return; } const r = await fetch('/api/memory/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, model }) }); const d = await r.json(); if (d.ok && d.facts && d.facts.length) { for (const f of d.facts) { await fetch('/api/memory/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: f }) }); } refreshMemory(); alert('Extracted ' + d.facts.length + ' facts'); } else { alert('No facts extracted'); } }}>Extract from chat</button>
           </div>
           {memories.map((m) => (
             <div key={m.id} class={`${card} p-3 flex justify-between items-start`}>
@@ -268,6 +308,7 @@ export default function App() {
                 <div class="font-medium text-sm text-gray-100">{s.name}</div>
                 <div class="text-xs text-gray-400">{s.description}</div>
               </div>
+              <button class="text-blue-400 text-xs ml-2" onClick={async () => { const r = await fetch('/api/skills/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, args: {} }) }); const d = await r.json(); alert(d.ok ? ('Result: ' + JSON.stringify(d.result)) : ('Error: ' + d.error)); }}>run</button>
               <button class="text-red-400 text-xs ml-2" onClick={() => delSkill(s.name)}>del</button>
             </div>
           ))}
@@ -377,6 +418,17 @@ export default function App() {
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
+            <div class="mt-3">
+              <div class="text-sm font-medium text-gray-200 mb-1">Pending actions</div>
+              <button class="text-xs text-blue-400" onClick={async () => {
+                const r = await fetch('/api/pending-actions'); const d = await r.json();
+                const acts = d.actions || [];
+                if (acts.length === 0) { alert('No pending actions'); return; }
+                const list = acts.map((a) => a.id + ' [' + a.status + '] ' + (a.name || '')).join('\\n');
+                const id = prompt('Pending actions:\\n' + list + '\\n\\nEnter action id to approve (or cancel):');
+                if (id) { await fetch('/api/pending-actions/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); alert('Approved ' + id); }
+              }}>Review pending</button>
+            </div>
           </div>
         </div>
       )}

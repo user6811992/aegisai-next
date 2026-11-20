@@ -28,6 +28,10 @@ integrations.registerAll();
 
 let projectRoot = null;
 
+// Pending actions (human-in-the-loop)
+const pendingActions = [];
+function queueAction(action) { const a = { id: 'pa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), status: 'pending', created: new Date().toISOString(), ...action }; pendingActions.push(a); return a; }
+
 function getProjectRoot() { return projectRoot; }
 function setProjectRoot(root) { projectRoot = root; }
 
@@ -187,6 +191,27 @@ const server = http.createServer(async (req, res) => {
       const id = db.saveMemory({ text: body.text, source: body.source || 'manual', tags: body.tags || [] });
       return json(res, 200, { ok: true, id });
     }
+    if (url === '/api/memory/extract' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const msgs = body.messages || [];
+      const text = msgs.map((m) => (m.role + ': ' + (m.content || ''))).join('\\n').slice(0, 8000);
+      const model = body.model || 'llama3.2:3b';
+      const prompt = 'Extract durable facts about the user or project from this conversation. Return a JSON array of short strings. Only include non-obvious, reusable facts.\\n\\nConversation:\\n' + text + '\\n\\nJSON array:';
+      try {
+        const r = await backends.backendChat({ model, messages: [{ role: 'user', content: prompt }], stream: false }, () => {});
+        const d = r && r.data ? r.data : r;
+        const content = (d && d.message && d.message.content) || '';
+        let facts = [];
+        try {
+          const m = content.match(/\\[[\\s\\S]*\\]/);
+          facts = m ? JSON.parse(m[0]) : [];
+        } catch (e) { facts = []; }
+        return json(res, 200, { ok: true, facts: Array.isArray(facts) ? facts : [] });
+      } catch (e) {
+        return json(res, 500, { ok: false, error: String(e.message || e) });
+      }
+    }
     if (url === '/api/memory/delete' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
@@ -204,6 +229,19 @@ const server = http.createServer(async (req, res) => {
       if (!body.name) return json(res, 400, { ok: false, error: 'name required' });
       db.saveSkill({ name: body.name, description: body.description || '', code: body.code || '' });
       return json(res, 200, { ok: true });
+    }
+    if (url === '/api/skills/run' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const skill = db.getSkill(body.name);
+      if (!skill) return json(res, 404, { ok: false, error: 'skill not found' });
+      try {
+        const fn = new Function('args', skill.code || '');
+        const result = fn(body.args || {});
+        return json(res, 200, { ok: true, result: (result === undefined ? null : result) });
+      } catch (e) {
+        return json(res, 200, { ok: false, error: String(e.message || e) });
+      }
     }
     if (url === '/api/skills/delete' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
@@ -376,6 +414,52 @@ const server = http.createServer(async (req, res) => {
         return { m, score };
       }).sort((x, y) => y.score - x.score).slice(0, body.limit || 10);
       return json(res, 200, { ok: true, results: scored.map((s) => ({ ...s.m, score: s.score })) });
+    }
+    if (url === '/api/squeeze' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      let text = body.text || '';
+      if (body.url) {
+        try {
+          const r = await fetch(body.url);
+          text = await r.text();
+        } catch (e) { return json(res, 400, { ok: false, error: 'fetch failed: ' + (e.message || e) }); }
+      }
+      text = text.slice(0, 30000);
+      const model = body.model || 'llama3.2:3b';
+      const prompt = 'Answer the following question based ONLY on the provided text. Be concise.\\n\\nQuestion: ' + (body.question || '') + '\\n\\nText:\\n' + text;
+      try {
+        const r = await backends.backendChat({ model, messages: [{ role: 'user', content: prompt }], stream: false }, () => {});
+        const d = r && r.data ? r.data : r;
+        const answer = (d && d.message && d.message.content) || '';
+        return json(res, 200, { ok: true, answer });
+      } catch (e) {
+        return json(res, 500, { ok: false, error: String(e.message || e) });
+      }
+    }
+    if (url === '/api/pending-actions' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { actions: pendingActions });
+    }
+    if (url === '/api/pending-actions/queue' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const a = queueAction(body);
+      return json(res, 200, { ok: true, action: a });
+    }
+    if (url === '/api/pending-actions/approve' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const a = pendingActions.find((x) => x.id === body.id);
+      if (a) a.status = 'approved';
+      return json(res, 200, { ok: true });
+    }
+    if (url === '/api/pending-actions/reject' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const a = pendingActions.find((x) => x.id === body.id);
+      if (a) a.status = 'rejected';
+      return json(res, 200, { ok: true });
     }
     if (url === '/api/rag/reindex' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
