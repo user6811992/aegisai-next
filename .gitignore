@@ -17,6 +17,7 @@ backend.txt
 # build output
 dist/
 build/
+public/assets/
 
 # OS
 .DS_Store
