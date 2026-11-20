@@ -111,6 +111,18 @@ const server = http.createServer(async (req, res) => {
       const b = require('./server/backends');
       return json(res, 200, { type: b.getType(), url: b.getUrl(), isOpenaiCompat: b.isOpenaiCompat() });
     }
+    if (url === '/api/backend' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const b = require('./server/backends');
+      b.setBackend(body.type, body.url);
+      // persist
+      const cfg = intConfig.load();
+      if (body.type) cfg.BACKEND_TYPE = body.type;
+      if (body.url) cfg.BACKEND_URL = body.url;
+      intConfig.save(cfg);
+      return json(res, 200, { ok: true, type: b.getType(), url: b.getUrl() });
+    }
     if (url === '/api/version') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, { version: VERSION });

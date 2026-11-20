@@ -421,6 +421,26 @@ export default function App() {
             <div class="mt-3 text-xs text-gray-400 space-y-1">
               <div>Backend: <span class="text-gray-200">{(integrations._backend || {}).type || 'loading…'}</span> at <span class="text-gray-200">{(integrations._backend || {}).url || ''}</span></div>
             </div>
+            <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
+              <select class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" id="backendType" defaultValue={(integrations._backend || {}).type || 'ollama'}>
+                <option value="ollama">ollama</option>
+                <option value="llamacpp">llamacpp</option>
+                <option value="lmstudio">lmstudio</option>
+                <option value="openai">openai</option>
+                <option value="strata">strata</option>
+              </select>
+              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" id="backendUrl" placeholder="http://127.0.0.1:11434" defaultValue={(integrations._backend || {}).url || ''} />
+              <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => {
+                const t = document.getElementById('backendType').value;
+                const u = document.getElementById('backendUrl').value;
+                const r = await fetch('/api/backend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: t, url: u }) });
+                const d = await r.json();
+                alert(d.ok ? ('Backend switched to ' + d.type) : ('Failed: ' + (d.error || 'unknown')));
+                const st = await (await fetch('/api/integrations/status')).json();
+                const b = await (await fetch('/api/backend')).json();
+                setIntegrations({ ...st, _backend: b });
+              }}>Apply</button>
+            </div>
             <div class="mt-2 flex gap-2">
               <button class="text-xs text-blue-400" onClick={async () => { const r = await fetch('/api/versions'); const d = await r.json(); alert('AegisAI: ' + d.aegisai + '\\nNode: ' + d.node + '\\nOllama: ' + d.ollama + '\\nREA: ' + (d.rea && d.rea.toolCount) + ' tools'); }}>Check versions</button>
               <button class="text-xs text-blue-400" onClick={async () => { const r = await fetch('/api/error-log'); const d = await r.json(); alert((d.content || '').slice(-1000) || 'No errors logged'); }}>View error log</button>

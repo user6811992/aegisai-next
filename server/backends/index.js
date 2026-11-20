@@ -13,6 +13,12 @@ const state = {
 
 function getType() { return state.type; }
 function getUrl() { return state.url; }
+function setBackend(type, url) {
+  if (type) state.type = type.toLowerCase();
+  if (url) state.url = url;
+  state.explicit = true;
+  console.log('Backend switched to:', state.type, 'at', state.url);
+}
 function getApiKey() { return state.apiKey; }
 function getSttUrl() { return state.sttUrl; }
 function getTtsUrl() { return state.ttsUrl; }
@@ -303,5 +309,5 @@ module.exports = {
   getType, getUrl, getApiKey, getSttUrl, getTtsUrl, isOpenaiCompat,
   detectStrataApiKey, detectBackend,
   backendListModels, backendShowModel, backendChat, backendPullModel,
-  ollamaStream,
+  ollamaStream, setBackend,
 };
