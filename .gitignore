@@ -14,6 +14,9 @@ error.log
 .env.*
 backend.txt
 
+# helper scripts
+scripts/
+
 # npm bin shims (created by global installs run from repo dir)
 rea
 rea.cmd

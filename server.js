@@ -425,27 +425,59 @@ const server = http.createServer(async (req, res) => {
       const path = require('path');
       const extDir = path.join(installDir, 'Extensions');
       fs.mkdirSync(extDir, { recursive: true });
-      const candidates = [
-        'https://github.com/symgraph/GhidrAssistMCP/releases/latest/download/GhidrAssistMCP.zip',
-        'https://github.com/symgraph/GhidrAssistMCP/releases/latest/download/GhidrAssistMCP.jar',
-      ];
-      let ok = false, dest = null;
-      for (const u of candidates) {
-        dest = path.join(extDir, path.basename(u));
+      // Fetch latest release to get the actual asset URL
+      let assetUrl = null, assetName = null;
+      try {
+        const releaseJson = await new Promise((resolve, reject) => {
+          https.get('https://api.github.com/repos/symgraph/GhidrAssistMCP/releases/latest', { headers: { 'User-Agent': 'AegisAI' } }, (res) => {
+            let b = ''; res.on('data', c => b += c); res.on('end', () => resolve(b));
+          }).on('error', reject);
+        });
+        const rel = JSON.parse(releaseJson);
+        const asset = (rel.assets || []).find(a => a.name.endsWith('.zip'));
+        if (asset) { assetUrl = asset.browser_download_url; assetName = asset.name; }
+      } catch (e) {}
+      if (!assetUrl) {
+        const st = await integrations.registry.statusAll();
+        return json(res, 200, { ok: false, error: 'Could not find release asset. Visit https://github.com/symgraph/GhidrAssistMCP/releases manually.', status: st.ghidra });
+      }
+      const zipPath = path.join(DATA_DIR, assetName);
+      const extractDir = path.join(DATA_DIR, 'tools', 'ghidra-mcp');
+      fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+      // Download
+      await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(zipPath);
+        https.get(assetUrl, { headers: { 'User-Agent': 'AegisAI' } }, (res) => {
+          res.pipe(file);
+          file.on('finish', () => { file.close(); resolve(); });
+        }).on('error', (e) => { fs.unlink(zipPath, () => {}); reject(e); });
+      });
+      // Extract using PowerShell Expand-Archive
+      const { runProcess } = require('./server/core/security');
+      const psBin = process.platform === 'win32' ? 'powershell.exe' : 'powershell';
+      fs.mkdirSync(extractDir, { recursive: true });
+      const r = await runProcess(psBin, ['-Command', 'Expand-Archive -Path \"' + zipPath + '\" -DestinationPath \"' + extractDir + '\" -Force'], { timeout: 300000, shell: true });
+      // Find ghidraRun in extracted dir
+      let ghidraDir = null;
+      const walk = (d) => {
         try {
-          const success = await new Promise((resolve) => {
-            const file = fs.createWriteStream(dest);
-            https.get(u, { headers: { 'User-Agent': 'AegisAI' } }, (res) => {
-              if (res.statusCode !== 200) { file.close(); fs.unlink(dest, () => {}); resolve(false); return; }
-              res.pipe(file);
-              file.on('finish', () => { file.close(); resolve(true); });
-            }).on('error', () => { file.close(); fs.unlink(dest, () => {}); resolve(false); });
-          });
-          if (success) { ok = true; break; }
+          for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+            const full = path.join(d, f.name);
+            if (f.isDirectory()) {
+              if (fs.existsSync(path.join(full, 'ghidraRun.bat')) || fs.existsSync(path.join(full, 'ghidraRun'))) ghidraDir = ghidraDir || full;
+              walk(full);
+            }
+          }
         } catch (e) {}
+      };
+      walk(extractDir);
+      if (ghidraDir) {
+        process.env.GHIDRA_INSTALL_DIR = ghidraDir;
+        const ghidra = require('./server/integrations/ghidra');
+        // reset cached url
       }
       const st = await integrations.registry.statusAll();
-      return json(res, 200, { ok, file: dest, error: ok ? null : 'No downloadable asset found. Visit https://github.com/symgraph/GhidrAssistMCP/releases manually.', status: st.ghidra });
+      return json(res, 200, { ok: true, extracted: ghidraDir || extractDir, zip: zipPath, status: st.ghidra });
     }
     if (url === '/api/integrations/ghidra/detect' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
