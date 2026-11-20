@@ -1,7 +1,10 @@
-const CACHE = 'aegisai-v1';
-self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/'])));
+// Pass-through service worker (disables caching). Unregisters on install.
+self.addEventListener('install', (e) => { self.skipWaiting(); });
+self.addEventListener('activate', (e) => {
+  e.waitUntil(self.registration.unregister().then(() => self.clients.matchAll()).then((clients) => {
+    clients.forEach((c) => c.navigate(c.url));
+  }));
 });
 self.addEventListener('fetch', (e) => {
-  e.respondWith(caches.match(e.request).then((r) => r || fetch(e.request)));
+  // pass through to network
 });
