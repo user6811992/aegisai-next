@@ -320,14 +320,22 @@ const server = http.createServer(async (req, res) => {
       const dir = path.join(DATA_DIR, 'tools', 'craft-anything');
       const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
       const gitBin = process.platform === 'win32' ? 'git.exe' : 'git';
+      const cargoBin = process.platform === 'win32' ? 'cargo.exe' : 'cargo';
+      // check cargo
+      const cargoCheck = await runProcess(cargoBin, ['--version'], { timeout: 10000, shell: true });
+      if (!cargoCheck.ok) {
+        const st = await integrations.registry.statusAll();
+        return json(res, 200, { ok: false, error: 'Rust/cargo is not installed. Install from https://rustup.rs then retry.', status: st.craft });
+      }
       let log = '';
       if (!fs.existsSync(dir)) {
         const r = await runProcess(gitBin, ['clone', 'https://github.com/storytold/craft-anything', dir], { timeout: 300000 });
         log += r.out + '\\n';
         if (!r.ok) { const st = await integrations.registry.statusAll(); return json(res, 200, { ok: false, error: r.err || 'clone failed', log: log.slice(-1000), status: st.craft }); }
       }
-      const r2 = await runProcess(npmBin, ['install'], { cwd: dir, timeout: 300000 });
+      const r2 = await runProcess(cargoBin, ['build', '--release'], { cwd: dir, timeout: 600000, shell: true });
       log += r2.out + '\\n';
+      if (!r2.ok) { const st = await integrations.registry.statusAll(); return json(res, 200, { ok: false, error: 'build failed', log: log.slice(-1000), status: st.craft }); }
       // find craft binary
       let found = null;
       const walk = (d) => {
@@ -355,7 +363,7 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const { runProcess } = require('./server/core/security');
       const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-      const r = await runProcess(npmBin, ['install', '-g', 'rea-agents'], { timeout: 300000 });
+      const r = await runProcess(npmBin, ['install', '-g', 'rea-agents'], { timeout: 300000, shell: true });
       if (!r.ok) {
         // fallback: try npx
         const r2 = await runProcess(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['--yes', 'rea-agents', '--version'], { timeout: 60000 });
