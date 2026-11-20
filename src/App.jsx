@@ -222,12 +222,21 @@ export default function App() {
             <h3 class="text-sm font-medium mt-2 mb-1 text-gray-200">Integrations</h3>
             <ul class="text-sm space-y-1">
               {Object.entries(integrations).map(([name, s]) => (
-                <li key={name} class="flex justify-between text-gray-300">
-                  <span>{name}</span>
-                  <span class={s.ready ? 'text-green-400' : 'text-gray-500'}>{s.ready ? 'ready' : 'off'} ({s.toolCount || 0} tools)</span>
+                <li key={name} class="text-gray-300">
+                  <div class="flex justify-between">
+                    <span>{name}</span>
+                    <span class={s.ready ? 'text-green-400' : 'text-gray-500'}>{s.ready ? 'ready' : 'off'} ({s.toolCount || 0} tools)</span>
+                  </div>
+                  {s.note && <div class="text-xs text-gray-500 ml-2">{s.note}</div>}
+                  {!s.ready && s.error && <div class="text-xs text-gray-500 ml-2">{s.error}</div>}
                 </li>
               ))}
             </ul>
+            <div class="mt-3 text-xs text-gray-500 space-y-1">
+              <div>To enable Ghidra: set GHIDRA_MCP_URL to your GhidrAssistMCP endpoint.</div>
+              <div>To enable Craft: set CRAFT_BIN to the craft-anything-cli binary.</div>
+              <div>Voice uses browser Web Speech API by default; set STT_URL/TTS_URL for backend audio.</div>
+            </div>
             <div class="mt-3 flex gap-2">
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
             </div>

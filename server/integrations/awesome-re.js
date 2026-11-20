@@ -29,7 +29,7 @@ const integration = {
   name: 'awesome-re',
   isAvailable: () => true,
   tools: () => [{ name: 'search_reverse_engineered', description: 'Search reverse-engineered projects.', inputSchema: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] } }],
-  status: () => ({ ready: !!data, error: data ? null : 'not loaded (run refresh)', toolCount: data ? 1 : 0, count: data ? data.length : 0 }),
+  status: () => ({ ready: true, error: data ? null : 'index not loaded yet (optional)', toolCount: 1, count: data ? data.length : 0 }),
   loadCached,
   search,
 };
