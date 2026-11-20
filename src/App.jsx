@@ -9,6 +9,7 @@ export default function App() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [integrations, setIntegrations] = useState({});
 
   useEffect(() => {
     fetch('/api/version').then((r) => r.json()).then((d) => setVersion(d.version)).catch(() => setVersion('?'));
@@ -17,6 +18,7 @@ export default function App() {
       setModels(ms);
       if (ms.length && !model) setModel(ms[0]);
     }).catch(() => {});
+    fetch('/api/integrations/status').then((r) => r.json()).then(setIntegrations).catch(() => {});
   }, []);
 
   async function send() {
@@ -108,7 +110,16 @@ export default function App() {
         <div class="fixed inset-0 bg-black/30 flex items-center justify-center" onClick={() => setShowSettings(false)}>
           <div class="bg-white rounded-lg p-4 w-96" onClick={(e) => e.stopPropagation()}>
             <h2 class="font-semibold mb-2">Settings</h2>
-            <p class="text-sm text-gray-600">Wave 2 scaffold. Memory, skills, branching land here.</p>
+            <h3 class="text-sm font-medium mt-2 mb-1">Integrations</h3>
+            <ul class="text-sm space-y-1">
+              {Object.entries(integrations).map(([name, s]) => (
+                <li key={name} class="flex justify-between">
+                  <span>{name}</span>
+                  <span class={s.ready ? 'text-green-600' : 'text-gray-400'}>{s.ready ? 'ready' : 'off'} ({s.toolCount || 0} tools)</span>
+                </li>
+              ))}
+            </ul>
+            <p class="text-xs text-gray-500 mt-3">Memory, skills, branching land in Wave 4.</p>
           </div>
         </div>
       )}

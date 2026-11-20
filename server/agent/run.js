@@ -4,7 +4,8 @@
 
 const backends = require('../backends');
 const coding = require('../tools/coding');
-const { ToolRegistry } = require('../tools/registry');
+const capabilities = require('../core/capabilities');
+const integrations = require('../integrations/register');
 
 const CLEAN_ROOM_BLOCKED = new Set([
   'read_file', 'write_file', 'delete_file', 'list_files', 'search_files',
@@ -27,8 +28,10 @@ async function runAgent(opts) {
     includeRe = false,
     cleanRoom = false,
     toolBudget = 64,
+    allowedTools,
+    deniedTools,
     onEvent = () => {},
-    externalTools = { ghidra: [], craft: [], are: [] },
+    externalTools = { ghidra: [], craft: [], are: [], rea: [] },
   } = opts;
 
   const toolLog = [];
@@ -57,6 +60,9 @@ async function runAgent(opts) {
       },
     });
   }
+
+  // capability-based filtering (allowedTools/deniedTools)
+  tools = capabilities.filterTools(tools, { allowedTools, deniedTools });
 
   // budget trim: coding first, then externals
   if (tools.length > toolBudget) {
@@ -112,9 +118,21 @@ async function runAgent(opts) {
       onEvent({ type: 'tool_call', name, args });
       let result;
       try {
-        if (name.startsWith('ghidra_') || name.startsWith('craft_') || name.startsWith('are_')) {
-          // external: not executed here (no MCP client in wave 1); simulate
+        if (name.startsWith('rea_')) {
+          const toolName = name.slice(4);
+          const intg = integrations.registry.list().find((i) => i.name === 'rea');
+          if (intg && typeof intg.callTool === 'function') {
+            const r = await intg.callTool(toolName, args);
+            result = { ok: true, output: JSON.stringify(r).slice(0, 2000) };
+          } else {
+            result = { ok: false, output: 'REA not available' };
+          }
+        } else if (name.startsWith('ghidra_') || name.startsWith('craft_') || name.startsWith('are_')) {
+          // external: simulate (MCP clients for these land later)
           result = { ok: true, output: 'simulated: ' + name };
+        } else if (name === 'are_search_reverse_engineered') {
+          const ar = require('../integrations/awesome-re');
+          result = { ok: true, output: JSON.stringify(ar.search(args.query, args.limit)) };
         } else {
           result = await Promise.resolve(coding.execCodingTool(name, args, projectRoot));
         }
