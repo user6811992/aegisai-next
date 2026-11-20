@@ -409,8 +409,13 @@ const server = http.createServer(async (req, res) => {
       const { runProcess } = require('./server/core/security');
       const ollamaBin = process.platform === 'win32' ? (process.env.OLLAMA_BIN || 'ollama') : 'ollama';
       const r = await runProcess(ollamaBin, ['pull', name], { timeout: 1800000, maxBuffer: 10 * 1024 * 1024, shell: true });
-      // Strip terminal spinner/ANSI characters
-      const clean = (s) => (s || '').replace(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/g, '').replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '').trim();
+      // Strip terminal spinner/ANSI/progress characters
+      const clean = (s) => (s || '')
+        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')  // ANSI escape sequences
+        .replace(/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏▕█▏]/g, '')  // spinner + progress bar chars
+        .replace(/\r/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
       return json(res, 200, r.ok ? { ok: true, message: clean(r.out || 'done').slice(-300) } : { ok: false, message: clean(r.out || r.err || ('exit code ' + r.code)).slice(-300) });
     }
     if (url === '/api/model-search' && req.method === 'POST') {
