@@ -28,10 +28,10 @@ async function available() {
   return out;
 }
 
-function statusAll() {
+async function statusAll() {
   const out = {};
   for (const [name, i] of integrations) {
-    out[name] = (typeof i.status === 'function') ? i.status() : { ready: false, error: null, toolCount: 0 };
+    out[name] = (typeof i.status === 'function') ? await i.status() : { ready: false, error: null, toolCount: 0 };
   }
   return out;
 }

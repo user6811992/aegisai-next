@@ -119,7 +119,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url === '/api/integrations/status' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
-      return json(res, 200, integrations.registry.statusAll());
+      return json(res, 200, await integrations.registry.statusAll());
     }
     if (url.startsWith('/api/integrations/') && url.endsWith('/call') && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
@@ -301,7 +301,15 @@ const server = http.createServer(async (req, res) => {
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       const cfg = intConfig.load();
       if (body.envKey) { cfg[body.envKey] = body.value || ''; intConfig.save(cfg); intConfig.apply({ [body.envKey]: body.value || '' }); }
-      return json(res, 200, { ok: true, status: integrations.registry.statusAll()[name] });
+      const st = await integrations.registry.statusAll();
+      return json(res, 200, { ok: true, status: st[name] });
+    }
+    if (url === '/api/integrations/awesome-re/update' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const ar = require('./server/integrations/awesome-re');
+      const data = await ar.refresh();
+      const st = await integrations.registry.statusAll();
+      return json(res, 200, { ok: !!data, count: data ? data.length : 0, status: st['awesome-re'] });
     }
     if (url === '/api/integrations/rea/update' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
@@ -309,7 +317,8 @@ const server = http.createServer(async (req, res) => {
       const r = await runProcess('npm', ['install', '-g', 'rea-agents'], { timeout: 300000 });
       // re-init
       try { await require('./server/integrations/rea').init(); } catch (e) {}
-      return json(res, 200, { ok: r.ok, output: (r.out || '').slice(-500), status: integrations.registry.statusAll().rea });
+      const st2 = await integrations.registry.statusAll();
+      return json(res, 200, { ok: r.ok, output: (r.out || '').slice(-500), status: st2.rea });
     }
     if (url.startsWith('/api/')) {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }

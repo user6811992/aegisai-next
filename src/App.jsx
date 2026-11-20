@@ -232,6 +232,9 @@ export default function App() {
                   {name === 'rea' && (
                     <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { await fetch('/api/integrations/rea/update', { method: 'POST' }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update REA</button>
                   )}
+                  {name === 'awesome-re' && (
+                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { await fetch('/api/integrations/awesome-re/update', { method: 'POST' }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update index</button>
+                  )}
                   {name === 'ghidra' && !s.ready && (
                     <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Ghidra MCP URL (e.g. http://127.0.0.1:8089):'); if (v) { await fetch('/api/integrations/ghidra/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'GHIDRA_MCP_URL', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); } }}>Configure</button>
                   )}
