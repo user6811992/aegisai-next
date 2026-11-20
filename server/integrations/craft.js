@@ -24,12 +24,11 @@ function findCraftBin() {
   return null;
 }
 
-let cached = null;
 function getBin() {
-  if (cached) return cached;
-  cached = findCraftBin();
-  if (cached) process.env.CRAFT_BIN = cached;
-  return cached;
+  if (process.env.CRAFT_BIN && fs.existsSync(process.env.CRAFT_BIN)) return process.env.CRAFT_BIN;
+  const found = findCraftBin();
+  if (found) process.env.CRAFT_BIN = found;
+  return found;
 }
 
 const integration = {

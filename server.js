@@ -311,14 +311,59 @@ const server = http.createServer(async (req, res) => {
       const st = await integrations.registry.statusAll();
       return json(res, 200, { ok: !!data, count: data ? data.length : 0, status: st['awesome-re'] });
     }
+    if (url === '/api/integrations/craft/install' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const { runProcess } = require('./server/core/security');
+      const fs = require('fs');
+      const path = require('path');
+      const { DATA_DIR } = require('./server/core/config');
+      const dir = path.join(DATA_DIR, 'tools', 'craft-anything');
+      const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+      const gitBin = process.platform === 'win32' ? 'git.exe' : 'git';
+      let log = '';
+      if (!fs.existsSync(dir)) {
+        const r = await runProcess(gitBin, ['clone', 'https://github.com/storytold/craft-anything', dir], { timeout: 300000 });
+        log += r.out + '\\n';
+        if (!r.ok) { const st = await integrations.registry.statusAll(); return json(res, 200, { ok: false, error: r.err || 'clone failed', log: log.slice(-1000), status: st.craft }); }
+      }
+      const r2 = await runProcess(npmBin, ['install'], { cwd: dir, timeout: 300000 });
+      log += r2.out + '\\n';
+      // find craft binary
+      let found = null;
+      const walk = (d) => {
+        try {
+          for (const f of fs.readdirSync(d, { withFileTypes: true })) {
+            const full = path.join(d, f.name);
+            if (f.isDirectory()) walk(full);
+            else if (/craft/i.test(f.name) && (f.name.endsWith('.exe') || f.name === 'craft' || f.name === 'craft-anything-cli')) found = found || full;
+          }
+        } catch (e) {}
+      };
+      walk(dir);
+      if (found) {
+        const cfg = intConfig.load();
+        cfg.CRAFT_BIN = found;
+        intConfig.save(cfg);
+        intConfig.apply({ CRAFT_BIN: found });
+        // reset cached
+        delete require.cache[require.resolve('./server/integrations/craft')];
+      }
+      const st = await integrations.registry.statusAll();
+      return json(res, 200, { ok: !!found, binary: found, log: log.slice(-1000), status: st.craft });
+    }
     if (url === '/api/integrations/rea/update' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const { runProcess } = require('./server/core/security');
-      const r = await runProcess('npm', ['install', '-g', 'rea-agents'], { timeout: 300000 });
+      const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+      const r = await runProcess(npmBin, ['install', '-g', 'rea-agents'], { timeout: 300000 });
+      if (!r.ok) {
+        // fallback: try npx
+        const r2 = await runProcess(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['--yes', 'rea-agents', '--version'], { timeout: 60000 });
+      }
       // re-init
       try { await require('./server/integrations/rea').init(); } catch (e) {}
       const st2 = await integrations.registry.statusAll();
-      return json(res, 200, { ok: r.ok, output: (r.out || '').slice(-500), status: st2.rea });
+      return json(res, 200, { ok: r.ok, output: (r.out || '').slice(-500), error: r.err, status: st2.rea });
     }
     if (url.startsWith('/api/')) {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
