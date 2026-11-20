@@ -368,6 +368,30 @@ const server = http.createServer(async (req, res) => {
       const d = ar.loadCached();
       return json(res, 200, { loaded: !!d, count: Array.isArray(d) ? d.length : 0 });
     }
+    if (url === '/api/are-readme' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const u = body.url;
+      if (!u) return json(res, 400, { ok: false, error: 'url required' });
+      const m = u.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+      if (!m) return json(res, 400, { ok: false, error: 'Not a GitHub URL' });
+      const owner = m[1], repo = m[2].replace(/\.git$/, '');
+      const https = require('https');
+      const fetchReadme = (branch) => new Promise((resolve, reject) => {
+        const apiUrl = 'https://api.github.com/repos/' + owner + '/' + repo + '/readme' + (branch ? '?ref=' + branch : '');
+        const headers = { 'User-Agent': 'AegisAI', 'Accept': 'application/vnd.github.v3.raw' };
+        if (process.env.GITHUB_TOKEN) headers['Authorization'] = 'token ' + process.env.GITHUB_TOKEN;
+        https.get(apiUrl, { headers }, (r) => {
+          let buf = ''; r.on('data', (c) => (buf += c));
+          r.on('end', () => { if (r.statusCode === 200) resolve(buf); else reject(new Error('HTTP ' + r.statusCode)); });
+        }).on('error', reject);
+      });
+      let content = '';
+      try { content = await fetchReadme(''); }
+      catch (e) { try { content = await fetchReadme('main'); } catch (e2) { try { content = await fetchReadme('master'); } catch (e3) { content = 'Could not fetch README: ' + e3.message; } } }
+      if (content.length > 3000) content = content.slice(0, 3000) + '\n... (truncated)';
+      return json(res, 200, { ok: true, content });
+    }
     if (url === '/api/are-data-refresh' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const ar = require('./server/integrations/awesome-re');

@@ -35,6 +35,10 @@ export default function App() {
   const [areQuery, setAreQuery] = useState('');
   const [areResults, setAreResults] = useState([]);
   const [areLoading, setAreLoading] = useState(false);
+  const [areCategory, setAreCategory] = useState('');
+  const [areLanguage, setAreLanguage] = useState('');
+  const [areMinStars, setAreMinStars] = useState(0);
+  const [areReadme, setAreReadme] = useState(null);
   const [ragQuery, setRagQuery] = useState('');
   const [ragResults, setRagResults] = useState([]);
 
@@ -176,7 +180,7 @@ export default function App() {
     if (!areQuery.trim()) return;
     setAreLoading(true);
     try {
-      const r = await fetch('/api/are-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: areQuery, limit: 30 }) });
+      const r = await fetch('/api/are-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: areQuery, limit: 30, category: areCategory, language: areLanguage, minStars: areMinStars }) });
       const d = await r.json();
       setAreResults(d.results || []);
     } catch (e) { setAreResults([]); }
@@ -324,8 +328,11 @@ export default function App() {
 
       {tab === 'are' && (
         <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
-          <div class="flex gap-2">
+          <div class="flex gap-2 flex-wrap">
             <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={areQuery} onInput={(e) => setAreQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') searchAre(); }} placeholder="Search reverse-engineered projects…" />
+            <input class="w-28 bg-gray-700 border border-gray-600 rounded px-2 py-2 text-sm text-gray-100 placeholder-gray-400" value={areCategory} onInput={(e) => setAreCategory(e.target.value)} placeholder="Category" />
+            <input class="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-2 text-sm text-gray-100 placeholder-gray-400" value={areLanguage} onInput={(e) => setAreLanguage(e.target.value)} placeholder="Language" />
+            <input class="w-20 bg-gray-700 border border-gray-600 rounded px-2 py-2 text-sm text-gray-100 placeholder-gray-400" type="number" value={areMinStars} onInput={(e) => setAreMinStars(parseInt(e.target.value) || 0)} placeholder="Min★" />
             <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={searchAre} disabled={areLoading}>{areLoading ? 'Searching…' : 'Search'}</button>
           </div>
           {areResults.map((r, i) => (
@@ -336,10 +343,21 @@ export default function App() {
               </div>
               <div class="text-xs text-gray-400 mt-1">{r.description}</div>
               <div class="text-xs text-gray-500 mt-1">{r.category} {r.language ? '· ' + r.language : ''}</div>
+              {r.url && <button class="text-xs text-blue-400 mt-1 hover:underline" onClick={async () => { const rr = await fetch('/api/are-readme', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: r.url }) }); const d = await rr.json(); setAreReadme(d.content || 'No README'); }}>Preview README</button>}
             </div>
           ))}
           {areResults.length === 0 && areQuery && !areLoading && <div class="text-sm text-gray-500">No results. Try "Update index" in Settings first.</div>}
         </main>
+      )}
+
+      {areReadme !== null && (
+        <div class="fixed inset-0 bg-black/60 flex items-center justify-center" onClick={() => setAreReadme(null)}>
+          <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 w-full max-w-2xl max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 class="font-semibold mb-2 text-white">README Preview</h2>
+            <pre class="text-xs text-gray-300 whitespace-pre-wrap">{areReadme}</pre>
+            <button class="mt-3 border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={() => setAreReadme(null)}>Close</button>
+          </div>
+        </div>
       )}
 
       {tab === 'models' && (
