@@ -4,7 +4,7 @@
 
 const state = {
   type: (process.env.BACKEND_TYPE || '').toLowerCase(),
-  url: process.env.BACKEND_URL || process.env.OLLAMA_URL || '',
+  url: process.env.BACKEND_URL || process.env.OLLAMA_URL || 'http://127.0.0.1:11434',
   apiKey: process.env.BACKEND_API_KEY || '',
   sttUrl: process.env.STT_URL || '',
   ttsUrl: process.env.TTS_URL || '',

@@ -136,42 +136,44 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  const card = 'bg-gray-800 border border-gray-700 rounded-lg';
+
   return (
-    <div class="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
-      <header class="bg-white border-b px-4 py-2 flex items-center gap-3">
-        <h1 class="font-semibold text-lg">AegisAI (next)</h1>
-        <span class="text-xs text-gray-500">v{version}</span>
+    <div class="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
+      <header class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center gap-3">
+        <h1 class="font-semibold text-lg text-white">AegisAI (next)</h1>
+        <span class="text-xs text-gray-400">v{version}</span>
         <nav class="ml-4 flex gap-2">
           {['chat', 'memory', 'skills'].map((t) => (
-            <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`} onClick={() => setTab(t)}>{t}</button>
+            <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={() => setTab(t)}>{t}</button>
           ))}
         </nav>
         <div class="ml-auto flex items-center gap-2">
-          <select class="border rounded px-2 py-1 text-sm" value={model} onChange={(e) => setModel(e.target.value)}>
+          <select class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" value={model} onChange={(e) => setModel(e.target.value)}>
             {models.map((m) => <option value={m}>{m}</option>)}
           </select>
-          <button class="border rounded px-2 py-1 text-sm" onClick={() => setShowSettings((s) => !s)}>Settings</button>
+          <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={() => setShowSettings((s) => !s)}>Settings</button>
         </div>
       </header>
 
       {tab === 'chat' && (
         <>
           <div class="px-4 py-1 flex gap-2 text-xs">
-            <button class="border rounded px-2 py-0.5" onClick={saveChat}>Save chat</button>
-            <button class="border rounded px-2 py-0.5" onClick={branchChat}>Branch</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
           </div>
           <main class="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
             {messages.map((m, i) => (
-              <div key={i} class={`rounded-lg p-3 ${m.role === 'user' ? 'bg-blue-50 ml-8' : 'bg-white border'}`}>
-                <div class="text-xs text-gray-500 mb-1">{m.role}</div>
-                <pre class="whitespace-pre-wrap text-sm">{m.content}</pre>
+              <div key={i} class={`rounded-lg p-3 ${m.role === 'user' ? 'bg-blue-900/40 ml-8 border border-blue-800' : 'bg-gray-800 border border-gray-700'}`}>
+                <div class="text-xs text-gray-400 mb-1">{m.role}</div>
+                <pre class="whitespace-pre-wrap text-sm text-gray-100">{m.content}</pre>
               </div>
             ))}
             {busy && <div class="text-sm text-gray-400">Thinking…</div>}
           </main>
-          <footer class="bg-white border-t p-3">
+          <footer class="bg-gray-800 border-t border-gray-700 p-3">
             <div class="max-w-3xl mx-auto flex gap-2">
-              <input class="flex-1 border rounded px-3 py-2 text-sm" value={input} onInput={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Message…" disabled={busy} />
+              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={input} onInput={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Message…" disabled={busy} />
               <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={send} disabled={busy}>Send</button>
             </div>
           </footer>
@@ -181,13 +183,13 @@ export default function App() {
       {tab === 'memory' && (
         <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
           <div class="flex gap-2">
-            <input class="flex-1 border rounded px-3 py-2 text-sm" value={newMemory} onInput={(e) => setNewMemory(e.target.value)} placeholder="New memory…" />
+            <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={newMemory} onInput={(e) => setNewMemory(e.target.value)} placeholder="New memory…" />
             <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={addMemory}>Add</button>
           </div>
           {memories.map((m) => (
-            <div key={m.id} class="bg-white border rounded p-3 flex justify-between items-start">
-              <div class="text-sm">{m.text}</div>
-              <button class="text-red-500 text-xs ml-2" onClick={() => delMemory(m.id)}>del</button>
+            <div key={m.id} class={`${card} p-3 flex justify-between items-start`}>
+              <div class="text-sm text-gray-100">{m.text}</div>
+              <button class="text-red-400 text-xs ml-2" onClick={() => delMemory(m.id)}>del</button>
             </div>
           ))}
         </main>
@@ -195,39 +197,39 @@ export default function App() {
 
       {tab === 'skills' && (
         <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
-          <div class="space-y-2 border rounded p-3 bg-white">
-            <input class="w-full border rounded px-3 py-2 text-sm" value={newSkillName} onInput={(e) => setNewSkillName(e.target.value)} placeholder="Skill name" />
-            <input class="w-full border rounded px-3 py-2 text-sm" value={newSkillDesc} onInput={(e) => setNewSkillDesc(e.target.value)} placeholder="Description" />
-            <textarea class="w-full border rounded px-3 py-2 text-sm font-mono" rows="4" value={newSkillCode} onInput={(e) => setNewSkillCode(e.target.value)} placeholder="Code" />
+          <div class={`space-y-2 border border-gray-700 rounded p-3 ${card}`}>
+            <input class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={newSkillName} onInput={(e) => setNewSkillName(e.target.value)} placeholder="Skill name" />
+            <input class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={newSkillDesc} onInput={(e) => setNewSkillDesc(e.target.value)} placeholder="Description" />
+            <textarea class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm font-mono text-gray-100 placeholder-gray-400" rows="4" value={newSkillCode} onInput={(e) => setNewSkillCode(e.target.value)} placeholder="Code" />
             <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={addSkill}>Save skill</button>
           </div>
           {skills.map((s) => (
-            <div key={s.name} class="bg-white border rounded p-3 flex justify-between items-start">
+            <div key={s.name} class={`${card} p-3 flex justify-between items-start`}>
               <div>
-                <div class="font-medium text-sm">{s.name}</div>
-                <div class="text-xs text-gray-500">{s.description}</div>
+                <div class="font-medium text-sm text-gray-100">{s.name}</div>
+                <div class="text-xs text-gray-400">{s.description}</div>
               </div>
-              <button class="text-red-500 text-xs ml-2" onClick={() => delSkill(s.name)}>del</button>
+              <button class="text-red-400 text-xs ml-2" onClick={() => delSkill(s.name)}>del</button>
             </div>
           ))}
         </main>
       )}
 
       {showSettings && (
-        <div class="fixed inset-0 bg-black/30 flex items-center justify-center" onClick={() => setShowSettings(false)}>
-          <div class="bg-white rounded-lg p-4 w-96" onClick={(e) => e.stopPropagation()}>
-            <h2 class="font-semibold mb-2">Settings</h2>
-            <h3 class="text-sm font-medium mt-2 mb-1">Integrations</h3>
+        <div class="fixed inset-0 bg-black/60 flex items-center justify-center" onClick={() => setShowSettings(false)}>
+          <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 w-96" onClick={(e) => e.stopPropagation()}>
+            <h2 class="font-semibold mb-2 text-white">Settings</h2>
+            <h3 class="text-sm font-medium mt-2 mb-1 text-gray-200">Integrations</h3>
             <ul class="text-sm space-y-1">
               {Object.entries(integrations).map(([name, s]) => (
-                <li key={name} class="flex justify-between">
+                <li key={name} class="flex justify-between text-gray-300">
                   <span>{name}</span>
-                  <span class={s.ready ? 'text-green-600' : 'text-gray-400'}>{s.ready ? 'ready' : 'off'} ({s.toolCount || 0} tools)</span>
+                  <span class={s.ready ? 'text-green-400' : 'text-gray-500'}>{s.ready ? 'ready' : 'off'} ({s.toolCount || 0} tools)</span>
                 </li>
               ))}
             </ul>
             <div class="mt-3 flex gap-2">
-              <button class="border rounded px-3 py-1 text-sm" onClick={exportBackup}>Export backup</button>
+              <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
             </div>
             <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
           </div>

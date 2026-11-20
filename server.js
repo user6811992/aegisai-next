@@ -302,10 +302,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-function start() {
+async function start() {
+  try { await backends.detectBackend(); } catch (e) {}
   server.listen(PORT, HOST, () => {
     console.log(`AegisAI (next) v${VERSION} listening on http://${HOST}:${PORT}`);
-    // Init optional integrations in the background (non-blocking).
     try { require('./server/integrations/rea').init().then(() => console.log('REA init done:', require('./server/integrations/rea').integration.status())).catch(() => {}); } catch (e) {}
   });
 }
