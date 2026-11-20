@@ -6,6 +6,9 @@ const path = require('path');
 const config = require('./server/core/config');
 const security = require('./server/core/security');
 const db = require('./server/storage/db');
+const backends = require('./server/backends');
+const agent = require('./server/agent/run');
+const coding = require('./server/tools/coding');
 
 const { PORT, HOST, MAX_BODY_BYTES, PROJECT_ROOT_ALLOWLIST, TOOL_BUDGET, PUBLIC_DIR, DATA_DIR } = config;
 
@@ -94,9 +97,42 @@ const server = http.createServer(async (req, res) => {
         return json(res, e.status || 400, { ok: false, error: e.message });
       }
     }
+    if (url === '/api/models' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      try {
+        const data = await backends.backendListModels();
+        return json(res, 200, data);
+      } catch (e) {
+        return json(res, 500, { ok: false, error: String(e.message || e) });
+      }
+    }
+    if (url === '/api/agent' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req) || '{}'); }
+      catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      const send = (obj) => res.write('data: ' + JSON.stringify(obj) + '\\n\\n');
+      const result = await agent.runAgent({
+        model: body.model,
+        messages: body.messages || [],
+        projectRoot: projectRoot,
+        includeCoding: body.includeCoding !== false,
+        includeRe: !!body.includeRe,
+        cleanRoom: !!body.cleanRoom,
+        externalTools: body.externalTools || { ghidra: [], craft: [], are: [] },
+        onEvent: send,
+      });
+      send({ type: 'done', final: result.final.final, toolLog: result.toolLog });
+      res.end();
+      return;
+    }
     if (url.startsWith('/api/')) {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
-      return json(res, 404, { ok: false, error: 'not implemented in wave 0' });
+      return json(res, 404, { ok: false, error: 'not implemented in wave 1' });
     }
     serveStatic(req, res);
   } catch (e) {
@@ -126,4 +162,8 @@ module.exports = {
   runProcess: security.runProcess,
   isValidModelName: security.isValidModelName,
   isSafeUrl: security.isSafeUrl,
+  runAgent: agent.runAgent,
+  isCleanRoomBlocked: agent.isCleanRoomBlocked,
+  backends,
+  coding,
 };
