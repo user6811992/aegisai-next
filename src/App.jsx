@@ -369,7 +369,7 @@ export default function App() {
             <h2 class="font-semibold mb-2 text-white">Settings</h2>
             <h3 class="text-sm font-medium mt-2 mb-1 text-gray-200">Integrations</h3>
             <ul class="text-sm space-y-1">
-              {Object.entries(integrations).map(([name, s]) => (
+              {Object.entries(integrations).filter(([name]) => name !== '_backend').map(([name, s]) => (
                 <li key={name} class="text-gray-300">
                   <div class="flex justify-between items-center">
                     <span>{name}</span>
@@ -419,7 +419,7 @@ export default function App() {
             </div>
             <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
             <div class="mt-3 text-xs text-gray-400 space-y-1">
-              <div>Backend: <span class="text-gray-200">{(integrations._backend || {}).type || 'loading…'}</span></div>
+              <div>Backend: <span class="text-gray-200">{(integrations._backend || {}).type || 'loading…'}</span> at <span class="text-gray-200">{(integrations._backend || {}).url || ''}</span></div>
             </div>
             <div class="mt-2 flex gap-2">
               <button class="text-xs text-blue-400" onClick={async () => { const r = await fetch('/api/versions'); const d = await r.json(); alert('AegisAI: ' + d.aegisai + '\\nNode: ' + d.node + '\\nOllama: ' + d.ollama + '\\nREA: ' + (d.rea && d.rea.toolCount) + ' tools'); }}>Check versions</button>
