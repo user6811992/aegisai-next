@@ -426,8 +426,47 @@ const server = http.createServer(async (req, res) => {
       try {
         if (fs.statSync(ollamaModels).isDirectory()) {
           found.push({ type: 'ollama-store', path: ollamaModels, label: 'Ollama model store' });
+          const manifestsDir = path.join(ollamaModels, 'manifests');
+          const walkManifests = (dir) => {
+            try {
+              for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) walkManifests(full);
+                else {
+                  const parts = full.replace(manifestsDir + path.sep, '').split(path.sep);
+                  const tag = parts.pop();
+                  const model = parts.join('/');
+                  if (model && tag) found.push({ type: 'ollama-model', path: full, label: model + ':' + tag });
+                }
+              }
+            } catch (e2) {}
+          };
+          try { walkManifests(manifestsDir); } catch (e2) {}
         }
       } catch (e) {}
+      // LM Studio model store
+      const lmStudioDirs = [path.join(home, '.cache', 'lm-studio', 'models'), path.join(home, '.lmstudio', 'models')];
+      for (const lmDir of lmStudioDirs) {
+        try {
+          if (fs.statSync(lmDir).isDirectory()) {
+            found.push({ type: 'lmstudio-store', path: lmDir, label: 'LM Studio model store' });
+            const walkLm = (dir, depth) => {
+              if (depth > 6) return;
+              try {
+                for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+                  if (f.name === 'node_modules' || f.name === '.git') continue;
+                  const full = path.join(dir, f.name);
+                  if (f.isDirectory()) walkLm(full, depth + 1);
+                  else if (f.isFile() && f.name.toLowerCase().endsWith('.gguf')) {
+                    try { const st2 = fs.statSync(full); found.push({ type: 'gguf', path: full, label: f.name, size: st2.size }); } catch (_) {}
+                  }
+                }
+              } catch (e) {}
+            };
+            walkLm(lmDir, 0);
+          }
+        } catch (e) {}
+      }
       // Scan common dirs for GGUF
       const scanDirs = [home, 'C:\\Models', 'D:\\Models'];
       const walk = (dir, depth) => {
