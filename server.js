@@ -95,6 +95,22 @@ function checkAuth(req) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = req.url.split('?')[0];
+    if (url === '/api/versions' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const { runProcess } = require('./server/core/security');
+      let ollamaVersion = 'unknown';
+      try {
+        const r = await runProcess(process.platform === 'win32' ? 'ollama.exe' : 'ollama', ['--version'], { timeout: 10000, shell: true });
+        ollamaVersion = (r.out || r.err || '').trim();
+      } catch (e) {}
+      const st = await integrations.registry.statusAll();
+      return json(res, 200, { aegisai: VERSION, node: process.version, ollama: ollamaVersion, rea: st.rea });
+    }
+    if (url === '/api/backend' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const b = require('./server/backends');
+      return json(res, 200, { type: b.getType(), url: b.getUrl(), isOpenaiCompat: b.isOpenaiCompat() });
+    }
     if (url === '/api/version') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, { version: VERSION });
@@ -460,6 +476,13 @@ const server = http.createServer(async (req, res) => {
       const a = pendingActions.find((x) => x.id === body.id);
       if (a) a.status = 'rejected';
       return json(res, 200, { ok: true });
+    }
+    if (url === '/api/error-log' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const fs = require('fs');
+      const p = path.join(config.DATA_DIR, 'error.log');
+      try { return json(res, 200, { content: fs.readFileSync(p, 'utf8') }); }
+      catch (e) { return json(res, 200, { content: '' }); }
     }
     if (url === '/api/rag/reindex' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }

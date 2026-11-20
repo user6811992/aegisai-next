@@ -29,6 +29,7 @@ export default function App() {
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillCode, setNewSkillCode] = useState('');
   const [chatId, setChatId] = useState(null);
+  const [cleanRoom, setCleanRoom] = useState(false);
   const [branches, setBranches] = useState([]);
   const [parentId, setParentId] = useState(null);
 
@@ -42,7 +43,7 @@ export default function App() {
       setModels(ms);
       if (ms.length && !model) setModel(ms[0]);
     }).catch(() => {});
-    fetch('/api/integrations/status').then((r) => r.json()).then(setIntegrations).catch(() => {});
+    fetch('/api/integrations/status').then((r) => r.json()).then((d) => { fetch('/api/backend').then((r) => r.json()).then((b) => setIntegrations({ ...d, _backend: b })).catch(() => setIntegrations(d)); }).catch(() => {});
     refreshMemory();
     refreshSkills();
   }, []);
@@ -62,7 +63,7 @@ export default function App() {
       const res = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false }),
+        body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false, cleanRoom }),
       });
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -230,6 +231,7 @@ export default function App() {
           <div class="px-4 py-1 flex gap-2 text-xs items-center">
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
+            <label class="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={cleanRoom} onChange={(e) => setCleanRoom(e.target.checked)} /> Clean room</label>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={navigateParent}>Parent</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={loadBranches}>Branches</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-red-400 hover:bg-gray-700" onClick={async () => { if (!chatId) { await saveChat(); } if (chatId && confirm('Delete this chat?')) { await fetch('/api/chats/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) }); setMessages([]); setChatId(null); } }}>Delete</button>
@@ -418,6 +420,13 @@ export default function App() {
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
+            <div class="mt-3 text-xs text-gray-400 space-y-1">
+              <div>Backend: <span class="text-gray-200">{(integrations._backend || {}).type || 'loading…'}</span></div>
+            </div>
+            <div class="mt-2 flex gap-2">
+              <button class="text-xs text-blue-400" onClick={async () => { const r = await fetch('/api/versions'); const d = await r.json(); alert('AegisAI: ' + d.aegisai + '\\nNode: ' + d.node + '\\nOllama: ' + d.ollama + '\\nREA: ' + (d.rea && d.rea.toolCount) + ' tools'); }}>Check versions</button>
+              <button class="text-xs text-blue-400" onClick={async () => { const r = await fetch('/api/error-log'); const d = await r.json(); alert((d.content || '').slice(-1000) || 'No errors logged'); }}>View error log</button>
+            </div>
             <div class="mt-3">
               <div class="text-sm font-medium text-gray-200 mb-1">Pending actions</div>
               <button class="text-xs text-blue-400" onClick={async () => {
