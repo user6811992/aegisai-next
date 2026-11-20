@@ -21,6 +21,9 @@ const { PORT, HOST, MAX_BODY_BYTES, PROJECT_ROOT_ALLOWLIST, TOOL_BUDGET, PUBLIC_
 const VERSION = require('./package.json').version;
 const TOKEN = process.env.LOCALAI_TOKEN || process.env.AEGISAI_TOKEN || '';
 
+const intConfig = require('./server/storage/integrations-config');
+intConfig.apply(intConfig.load());
+
 integrations.registerAll();
 
 let projectRoot = null;
@@ -290,6 +293,23 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/rag/reindex' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, { ok: true, message: 'reindex scheduled (stub)' });
+    }
+    const cfgMatch = url.match(/^\/api\/integrations\/([^/]+)\/configure$/);
+    if (cfgMatch && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const name = cfgMatch[1];
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const cfg = intConfig.load();
+      if (body.envKey) { cfg[body.envKey] = body.value || ''; intConfig.save(cfg); intConfig.apply({ [body.envKey]: body.value || '' }); }
+      return json(res, 200, { ok: true, status: integrations.registry.statusAll()[name] });
+    }
+    if (url === '/api/integrations/rea/update' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const { runProcess } = require('./server/core/security');
+      const r = await runProcess('npm', ['install', '-g', 'rea-agents'], { timeout: 300000 });
+      // re-init
+      try { await require('./server/integrations/rea').init(); } catch (e) {}
+      return json(res, 200, { ok: r.ok, output: (r.out || '').slice(-500), status: integrations.registry.statusAll().rea });
     }
     if (url.startsWith('/api/')) {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }

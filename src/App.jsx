@@ -223,20 +223,27 @@ export default function App() {
             <ul class="text-sm space-y-1">
               {Object.entries(integrations).map(([name, s]) => (
                 <li key={name} class="text-gray-300">
-                  <div class="flex justify-between">
+                  <div class="flex justify-between items-center">
                     <span>{name}</span>
                     <span class={s.ready ? 'text-green-400' : 'text-gray-500'}>{s.ready ? 'ready' : 'off'} ({s.toolCount || 0} tools)</span>
                   </div>
                   {s.note && <div class="text-xs text-gray-500 ml-2">{s.note}</div>}
                   {!s.ready && s.error && <div class="text-xs text-gray-500 ml-2">{s.error}</div>}
+                  {name === 'rea' && (
+                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { await fetch('/api/integrations/rea/update', { method: 'POST' }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update REA</button>
+                  )}
+                  {name === 'ghidra' && !s.ready && (
+                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Ghidra MCP URL (e.g. http://127.0.0.1:8089):'); if (v) { await fetch('/api/integrations/ghidra/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'GHIDRA_MCP_URL', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); } }}>Configure</button>
+                  )}
+                  {name === 'craft' && !s.ready && (
+                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Path to craft-anything-cli binary:'); if (v) { await fetch('/api/integrations/craft/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'CRAFT_BIN', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); } }}>Configure</button>
+                  )}
+                  {name === 'voice' && (
+                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('STT_URL (leave blank to skip):'); const t = prompt('TTS_URL (leave blank to skip):'); await fetch('/api/integrations/voice/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'STT_URL', value: v || '' }) }); await fetch('/api/integrations/voice/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'TTS_URL', value: t || '' }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Configure audio</button>
+                  )}
                 </li>
               ))}
             </ul>
-            <div class="mt-3 text-xs text-gray-500 space-y-1">
-              <div>To enable Ghidra: set GHIDRA_MCP_URL to your GhidrAssistMCP endpoint.</div>
-              <div>To enable Craft: set CRAFT_BIN to the craft-anything-cli binary.</div>
-              <div>Voice uses browser Web Speech API by default; set STT_URL/TTS_URL for backend audio.</div>
-            </div>
             <div class="mt-3 flex gap-2">
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
             </div>
