@@ -1,5 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 export default function App() {
   const [version, setVersion] = useState('...');
@@ -11,6 +13,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [integrations, setIntegrations] = useState({});
   const [tab, setTab] = useState('chat');
+  const [areQuery, setAreQuery] = useState('');
+  const [areResults, setAreResults] = useState([]);
+  const [areLoading, setAreLoading] = useState(false);
   const [memories, setMemories] = useState([]);
   const [skills, setSkills] = useState([]);
   const [newMemory, setNewMemory] = useState('');
@@ -43,11 +48,13 @@ export default function App() {
     setBusy(true);
     const assistant = { role: 'assistant', content: '' };
     setMessages([...next, assistant]);
+    let cfg = {};
+    try { cfg = await (await fetch('/api/settings')).json(); } catch (e) {}
     try {
       const res = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: next, includeCoding: true }),
+        body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false }),
       });
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -126,6 +133,17 @@ export default function App() {
     refreshSkills();
   }
 
+  async function searchAre() {
+    if (!areQuery.trim()) return;
+    setAreLoading(true);
+    try {
+      const r = await fetch('/api/are-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: areQuery, limit: 30 }) });
+      const d = await r.json();
+      setAreResults(d.results || []);
+    } catch (e) { setAreResults([]); }
+    finally { setAreLoading(false); }
+  }
+
   async function exportBackup() {
     const r = await fetch('/api/backup');
     const d = await r.json();
@@ -144,7 +162,7 @@ export default function App() {
         <h1 class="font-semibold text-lg text-white">AegisAI (next)</h1>
         <span class="text-xs text-gray-400">v{version}</span>
         <nav class="ml-4 flex gap-2">
-          {['chat', 'memory', 'skills'].map((t) => (
+          {['chat', 'memory', 'skills', 'are'].map((t) => (
             <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={() => setTab(t)}>{t}</button>
           ))}
         </nav>
@@ -158,15 +176,17 @@ export default function App() {
 
       {tab === 'chat' && (
         <>
-          <div class="px-4 py-1 flex gap-2 text-xs">
+          <div class="px-4 py-1 flex gap-2 text-xs items-center">
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-red-400 hover:bg-gray-700" onClick={async () => { if (!chatId) { await saveChat(); } if (chatId && confirm('Delete this chat?')) { await fetch('/api/chats/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) }); setMessages([]); setChatId(null); } }}>Delete</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const blob = new Blob([JSON.stringify({ title: 'Chat', messages }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'chat.json'; a.click(); URL.revokeObjectURL(url); }}>Export</button>
           </div>
           <main class="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
             {messages.map((m, i) => (
               <div key={i} class={`rounded-lg p-3 ${m.role === 'user' ? 'bg-blue-900/40 ml-8 border border-blue-800' : 'bg-gray-800 border border-gray-700'}`}>
                 <div class="text-xs text-gray-400 mb-1">{m.role}</div>
-                <pre class="whitespace-pre-wrap text-sm text-gray-100">{m.content}</pre>
+                <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(m.content || '')) }} />
               </div>
             ))}
             {busy && <div class="text-sm text-gray-400">Thinking…</div>}
@@ -215,6 +235,26 @@ export default function App() {
         </main>
       )}
 
+      {tab === 'are' && (
+        <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
+          <div class="flex gap-2">
+            <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={areQuery} onInput={(e) => setAreQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') searchAre(); }} placeholder="Search reverse-engineered projects…" />
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={searchAre} disabled={areLoading}>{areLoading ? 'Searching…' : 'Search'}</button>
+          </div>
+          {areResults.map((r, i) => (
+            <div key={i} class="bg-gray-800 border border-gray-700 rounded p-3">
+              <div class="flex justify-between items-start">
+                <a href={r.url} target="_blank" class="font-medium text-sm text-blue-400 hover:underline">{r.name}</a>
+                {r.stars && <span class="text-xs text-gray-500">{r.stars} ⭐</span>}
+              </div>
+              <div class="text-xs text-gray-400 mt-1">{r.description}</div>
+              <div class="text-xs text-gray-500 mt-1">{r.category} {r.language ? '· ' + r.language : ''}</div>
+            </div>
+          ))}
+          {areResults.length === 0 && areQuery && !areLoading && <div class="text-sm text-gray-500">No results. Try "Update index" in Settings first.</div>}
+        </main>
+      )}
+
       {showSettings && (
         <div class="fixed inset-0 bg-black/60 flex items-center justify-center" onClick={() => setShowSettings(false)}>
           <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 w-96" onClick={(e) => e.stopPropagation()}>
@@ -256,8 +296,18 @@ export default function App() {
                 </li>
               ))}
             </ul>
-            <div class="mt-3 flex gap-2">
-              <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
+            <div class="mt-3 space-y-2">
+              <div class="flex items-center gap-2 text-sm text-gray-300">
+                <label>Tool budget:</label>
+                <input class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" type="number" defaultValue={64} onBlur={async (e) => { const s = await (await fetch('/api/settings')).json(); s.toolBudget = parseInt(e.target.value) || 64; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); }} />
+              </div>
+              <div class="flex items-center gap-2 text-sm text-gray-300">
+                <label><input type="checkbox" defaultChecked onChange={async (e) => { const s = await (await fetch('/api/settings')).json(); s.includeCoding = e.target.checked; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); }} /> Coding tools</label>
+                <label><input type="checkbox" defaultChecked onChange={async (e) => { const s = await (await fetch('/api/settings')).json(); s.includeRe = e.target.checked; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); }} /> RE tools</label>
+              </div>
+              <div class="flex gap-2">
+                <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
+              </div>
             </div>
             <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
           </div>

@@ -42,10 +42,30 @@ async function refresh() {
   return data;
 }
 
-function search(query, limit) {
+function search(query, opts) {
+  opts = opts || {};
   if (!data || !Array.isArray(data)) return [];
+  const limit = (opts.limit === undefined || opts.limit === null) ? 20 : opts.limit;
+  if (limit <= 0) return [];
   const q = String(query || '').toLowerCase();
-  return data.filter((p) => (p.name || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q)).slice(0, limit || 20);
+  const category = opts.category || '';
+  const language = opts.language || '';
+  const minStars = opts.minStars || 0;
+  const results = [];
+  for (const entry of data) {
+    if (!entry) continue;
+    if (category && (entry.category || '').toLowerCase() !== category.toLowerCase()) continue;
+    const entryLang = entry.lang || entry.language || '';
+    if (language && entryLang.toLowerCase() !== language.toLowerCase()) continue;
+    if (minStars && (entry.stars || 0) < minStars) continue;
+    const topics = Array.isArray(entry.topics) ? entry.topics : [];
+    const entryDesc = entry.desc || entry.description || '';
+    const searchable = ((entry.name || '') + ' ' + entryDesc + ' ' + topics.join(' ') + ' ' + (entry.category || '')).toLowerCase();
+    if (q && !searchable.includes(q)) continue;
+    results.push(entry);
+    if (results.length >= limit) break;
+  }
+  return results;
 }
 
 const integration = {

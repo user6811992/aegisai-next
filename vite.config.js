@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [preact(), tailwindcss()],
-  publicDir: false,
+  publicDir: 'static',
   build: {
     outDir: 'public',
     emptyOutDir: true,

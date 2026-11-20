@@ -157,6 +157,7 @@ const server = http.createServer(async (req, res) => {
         else if (i.name === 'rea') ext.rea = ts;
       }
       // REA tools namespaced as rea_ in agent; map them into ext.rea (already).
+      const s = settings.load();
       const result = await agent.runAgent({
         model: body.model,
         messages: body.messages || [],
@@ -164,6 +165,7 @@ const server = http.createServer(async (req, res) => {
         includeCoding: body.includeCoding !== false,
         includeRe: !!body.includeRe,
         cleanRoom: !!body.cleanRoom,
+        toolBudget: body.toolBudget || s.toolBudget || config.TOOL_BUDGET,
         allowedTools: body.allowedTools,
         deniedTools: body.deniedTools,
         externalTools: body.externalTools || ext,
@@ -290,6 +292,27 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
     // ---------- RAG reindex (stub) ----------
+    if (url === '/api/are-search' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const ar = require('./server/integrations/awesome-re');
+      const data = ar.loadCached() || (await ar.refresh());
+      if (!data) { return json(res, 503, { ok: false, message: 'ARE data not loaded yet.' }); }
+      const results = ar.search(body.query, { category: body.category, language: body.language, minStars: body.minStars, limit: body.limit });
+      return json(res, 200, { ok: true, count: results.length, results: results.map((e) => ({ name: e.name, description: e.desc || e.description || '', stars: e.stars, language: e.lang || e.language || '', category: e.category, url: e.url, health: e.health })) });
+    }
+    if (url === '/api/are-data-status' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const ar = require('./server/integrations/awesome-re');
+      const d = ar.loadCached();
+      return json(res, 200, { loaded: !!d, count: Array.isArray(d) ? d.length : 0 });
+    }
+    if (url === '/api/are-data-refresh' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const ar = require('./server/integrations/awesome-re');
+      const data = await ar.refresh();
+      return json(res, 200, { ok: true, count: Array.isArray(data) ? data.length : 0 });
+    }
     if (url === '/api/rag/reindex' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, { ok: true, message: 'reindex scheduled (stub)' });
