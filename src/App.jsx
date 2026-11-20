@@ -41,6 +41,8 @@ export default function App() {
   const [areReadme, setAreReadme] = useState(null);
   const [ragQuery, setRagQuery] = useState('');
   const [ragResults, setRagResults] = useState([]);
+  const [toolLog, setToolLog] = useState([]);
+  const [showToolLog, setShowToolLog] = useState(false);
 
   const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
   const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
@@ -79,6 +81,7 @@ export default function App() {
       const data = await res.json();
       console.log('agent response:', data.final);
       if (data.toolLog && data.toolLog.length) {
+        setToolLog((prev) => [...prev, ...data.toolLog.map((t) => ({ ...t, ts: Date.now() }))]);
         for (const t of data.toolLog) {
           assistant.content += '\n🔧 ' + t.name + '\n';
         }
@@ -87,6 +90,16 @@ export default function App() {
       if (!finalText && !(data.toolLog && data.toolLog.length)) finalText = '[Model returned an empty response. Try a chat-capable model like llama3.2:3b or mistral:7b.]';
       if (data.error) finalText = 'Error: ' + data.error;
       assistant.content += finalText;
+      const cites = [];
+      if (data.toolLog) {
+        for (const t of data.toolLog) {
+          if (t.name === 'web_search') {
+            const urls = (t.resultPreview || '').match(/https?:\/\/[^\s)]+/g) || [];
+            cites.push(...urls);
+          }
+        }
+      }
+      assistant.citations = [...new Set(cites)].slice(0, 5);
       setMessages([...next, { ...assistant }]);
       // auto-save
       try {
@@ -210,6 +223,7 @@ export default function App() {
           ))}
         </nav>
         <div class="ml-auto flex items-center gap-2">
+          {(() => { const chars = messages.reduce((a, m) => a + (m.content || '').length, 0); const pct = Math.min(100, Math.round((chars / 4 / 8192) * 100)); return <div class="w-20 h-2 bg-gray-700 rounded overflow-hidden" title={'~' + Math.round(chars/4) + ' tokens'}><div class="h-full bg-blue-500" style={{ width: pct + '%' }} /></div>; })()}
           <select class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" value={model} onChange={(e) => setModel(e.target.value)}>
             {models.map((m) => <option value={m}>{m}</option>)}
           </select>
@@ -227,6 +241,7 @@ export default function App() {
             </div>
           )}
           <div class="px-4 py-1 flex gap-2 text-xs items-center flex-wrap">
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={() => setShowToolLog((s) => !s)}>Tool log ({toolLog.length})</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={() => { const t = prompt('Chat title:', 'Chat'); if (t) { fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId, title: t, messages }) }); } }}>Rename</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
@@ -245,10 +260,27 @@ export default function App() {
                   {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
                 </div>
                 <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: (function() { try { const html = marked.parse(m.content || ''); return (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) ? DOMPurify.sanitize(html) : html; } catch (e) { return (m.content || '').replace(/</g, '&lt;'); } })() }} />
+                {m.citations && m.citations.length > 0 && (
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    {m.citations.map((c, i) => (
+                      <a key={i} href={c} target="_blank" class="text-xs text-blue-400 border border-blue-800 rounded px-2 py-0.5 hover:bg-blue-900/30">{new URL(c).hostname}</a>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
             {busy && <div class="text-sm text-gray-400">Thinking…</div>}
+            {(() => { const chars = messages.reduce((a, m) => a + (m.content || '').length, 0); const pct = Math.round((chars / 4 / 8192) * 100); return pct > 80 ? <div class="text-xs text-yellow-400">⚠ Context {pct}% full — consider starting a new chat</div> : null; })()}
           </main>
+          {showToolLog && toolLog.length > 0 && (
+            <div class="px-4 py-2 max-w-3xl w-full mx-auto">
+              <div class="bg-gray-800 border border-gray-700 rounded p-2 max-h-40 overflow-auto text-xs font-mono text-gray-300 space-y-1">
+                {toolLog.map((t, i) => (
+                  <div key={i}>{t.name}: {String(t.resultPreview || '').slice(0, 120)}</div>
+                ))}
+              </div>
+            </div>
+          )}
           <footer class="bg-gray-800 border-t border-gray-700 p-3">
             <div class="max-w-3xl mx-auto flex gap-2">
               <button class="border border-gray-600 rounded px-2 py-2 text-sm text-gray-200 hover:bg-gray-700" onClick={() => {
