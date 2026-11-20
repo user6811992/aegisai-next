@@ -3,8 +3,14 @@ import { useState, useEffect } from 'preact/hooks';
 import './styles.css';
 import App from './App.jsx';
 
+console.log('main.jsx loaded');
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
 
-render(<App />, document.getElementById('app'));
+try {
+  render(<App />, document.getElementById('app'));
+} catch (e) {
+  console.error('Render error:', e);
+  document.getElementById('app').innerHTML = '<pre style="color:red;padding:1rem">' + (e && e.message ? e.message : e) + '</pre>';
+}
