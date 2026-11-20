@@ -1,0 +1,17 @@
+{
+  "name": "aegisai-next",
+  "version": "0.1.0",
+  "description": "AegisAI (next) - modular rebuild: local AI web UI with Ollama backend, privacy-first, no telemetry.",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "pdf-parse": "^1.1.1"
+  }
+}

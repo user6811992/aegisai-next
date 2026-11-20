@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# runtime data
+data/
+*.db
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+error.log
+
+# secrets / env
+.env
+.env.*
+backend.txt
+
+# build output
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
