@@ -435,6 +435,7 @@ export default function App() {
                     {r.downloads && <span class="text-gray-500 ml-2">{r.downloads} dl</span>}
                   </div>
                   {r.source === 'ollama' && <button class="text-blue-400 hover:underline" onClick={() => setPullModel(r.name + ':latest')}>pull</button>}
+                  {r.source === 'huggingface' && <button class="text-blue-400 hover:underline" onClick={() => { window.open(r.url, '_blank'); }}>open</button>}
                 </div>
               ))}
             </div>
