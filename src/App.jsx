@@ -80,6 +80,7 @@ export default function App() {
           if (!line.startsWith('data: ')) continue;
           try {
             const evt = JSON.parse(line.slice(6));
+            console.log('SSE:', evt.type, evt.final || evt.content || '');
             if (evt.type === 'token') {
               assistant.content += evt.content || '';
               setMessages([...next, { ...assistant }]);
