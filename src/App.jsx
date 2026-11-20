@@ -22,6 +22,8 @@ export default function App() {
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillCode, setNewSkillCode] = useState('');
   const [chatId, setChatId] = useState(null);
+  const [chats, setChats] = useState([]);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [branches, setBranches] = useState([]);
   const [parentId, setParentId] = useState(null);
   const [cleanRoom, setCleanRoom] = useState(false);
@@ -46,6 +48,8 @@ export default function App() {
 
   const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
   const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
+  const loadChats = () => fetch('/api/chats').then((r) => r.json()).then((d) => setChats(d.chats || [])).catch(() => {});
+  const newChat = () => { setMessages([]); setChatId(null); setBranches([]); setToolLog([]); };
 
   useEffect(() => {
     fetch('/api/version').then((r) => r.json()).then((d) => setVersion(d.version)).catch(() => setVersion('?'));
@@ -57,6 +61,7 @@ export default function App() {
     fetch('/api/integrations/status').then((r) => r.json()).then((d) => { fetch('/api/backend').then((r) => r.json()).then((b) => setIntegrations({ ...d, _backend: b })).catch(() => setIntegrations(d)); }).catch(() => {});
     refreshMemory();
     refreshSkills();
+    loadChats();
   }, []);
 
   async function send() {
@@ -90,6 +95,7 @@ export default function App() {
       if (!finalText && !(data.toolLog && data.toolLog.length)) finalText = '[Model returned an empty response. Try a chat-capable model like llama3.2:3b or mistral:7b.]';
       if (data.error) finalText = 'Error: ' + data.error;
       assistant.content += finalText;
+      assistant.thinking = data.thinking || '';
       const cites = [];
       if (data.toolLog) {
         for (const t of data.toolLog) {
@@ -214,10 +220,25 @@ export default function App() {
 
   return (
     <div class="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
+      {showSidebar && (
+        <div class="fixed inset-y-0 left-0 z-40 bg-gray-800 border-r border-gray-700 w-64 overflow-auto p-2 space-y-1 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium text-white">Chats</span>
+            <button class="text-gray-400 hover:text-white" onClick={() => setShowSidebar(false)}>✕</button>
+          </div>
+          <button class="w-full text-left text-sm bg-blue-600 text-white rounded px-3 py-2 mb-2" onClick={() => { newChat(); setShowSidebar(false); }}>+ New chat</button>
+          {chats.map((c) => (
+            <button key={c.id} class={`w-full text-left text-xs rounded px-3 py-2 truncate ${chatId === c.id ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={async () => { const r = await fetch('/api/chats/' + c.id); const d = await r.json(); setMessages(d.messages || []); setChatId(c.id); setShowSidebar(false); loadChats(); }}>
+              {c.title || 'Untitled'}
+            </button>
+          ))}
+        </div>
+      )}
       <header class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center gap-3">
         <h1 class="font-semibold text-lg text-white">AegisAI (next)</h1>
         <span class="text-xs text-gray-400">v{version}</span>
         <nav class="ml-4 flex gap-2">
+          <button class="text-sm px-2 py-1 rounded text-gray-300 hover:bg-gray-700" onClick={() => { setShowSidebar((s) => !s); loadChats(); }}>Chats</button>
           {['chat', 'memory', 'skills', 'are', 'models'].map((t) => (
             <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={() => setTab(t)}>{t}</button>
           ))}
@@ -259,6 +280,12 @@ export default function App() {
                   <span>{m.role}</span>
                   {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
                 </div>
+                {m.thinking && (
+                  <details class="mb-2">
+                    <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300">💭 Thinking</summary>
+                    <div class="text-xs text-gray-400 mt-1 whitespace-pre-wrap bg-gray-900/50 rounded p-2">{m.thinking}</div>
+                  </details>
+                )}
                 <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: (function() { try { const html = marked.parse(m.content || ''); return (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) ? DOMPurify.sanitize(html) : html; } catch (e) { return (m.content || '').replace(/</g, '&lt;'); } })() }} />
                 {m.citations && m.citations.length > 0 && (
                   <div class="mt-2 flex flex-wrap gap-1">

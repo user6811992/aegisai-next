@@ -98,11 +98,11 @@ async function runAgent(opts) {
     const data = resp && resp.data ? resp.data : resp;
     const msg = (data && data.message) || {};
     const toolCalls = msg.tool_calls || (msg.tool_calls === undefined ? null : msg.tool_calls);
+    const thinking = msg.thinking || msg.reasoning_content || '';
 
     if (!toolCalls || (Array.isArray(toolCalls) && toolCalls.length === 0)) {
       const finalText = msg.content || '';
-      onEvent({ type: 'done', final: finalText, toolLog });
-      return { final: { type: 'done', final: finalText, toolLog }, toolLog };
+      return { final: { type: 'done', final: finalText, thinking, toolLog }, toolLog };
     }
 
     // append assistant message with tool_calls

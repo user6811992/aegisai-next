@@ -200,7 +200,7 @@ const server = http.createServer(async (req, res) => {
         externalTools: body.externalTools || ext,
         onEvent: () => {},
       });
-      return json(res, 200, { ok: true, final: result.final.final, toolLog: result.toolLog });
+      return json(res, 200, { ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog });
     }
     // ---------- Memory ----------
     if (url === '/api/memory' && req.method === 'GET') {
