@@ -4,9 +4,10 @@ import './styles.css';
 import App from './App.jsx';
 
 console.log('main.jsx loaded');
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
-}
+// Service worker temporarily disabled for debugging
+// if ('serviceWorker' in navigator) {
+//   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+// }
 
 try {
   render(<App />, document.getElementById('app'));
