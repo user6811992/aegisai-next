@@ -8,6 +8,8 @@ export default function App() {
   const [model, setModel] = useState('');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [inputHistory, setInputHistory] = useState([]);
+  const [historyIdx, setHistoryIdx] = useState(-1);
   const [busy, setBusy] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [integrations, setIntegrations] = useState({});
@@ -52,6 +54,8 @@ export default function App() {
 
   async function send() {
     if (!input.trim() || busy) return;
+    setInputHistory((h) => [...h, input]);
+    setHistoryIdx(-1);
     const userMsg = { role: 'user', content: input };
     const next = [...messages, userMsg];
     setMessages(next);
@@ -74,7 +78,10 @@ export default function App() {
           assistant.content += '\n🔧 ' + t.name + '\n';
         }
       }
-      assistant.content += (data.final || '');
+      let finalText = data.final || '';
+      if (!finalText && !(data.toolLog && data.toolLog.length)) finalText = '[Model returned an empty response. Try a chat-capable model like llama3.2:3b or mistral:7b.]';
+      if (data.error) finalText = 'Error: ' + data.error;
+      assistant.content += finalText;
       setMessages([...next, { ...assistant }]);
       // auto-save
       try {
@@ -246,7 +253,11 @@ export default function App() {
                 rec.onresult = (e) => { setInput((prev) => (prev + ' ' + e.results[0][0].transcript).trim()); };
                 rec.start();
               }}>🎤</button>
-              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={input} onInput={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Message…" disabled={busy} />
+              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={input} onInput={(e) => setInput(e.target.value)} onKeyDown={(e) => {
+                if (e.key === 'Enter') { send(); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); if (inputHistory.length === 0) return; const newIdx = historyIdx === -1 ? inputHistory.length - 1 : Math.max(0, historyIdx - 1); setHistoryIdx(newIdx); setInput(inputHistory[newIdx]); }
+                else if (e.key === 'ArrowDown') { e.preventDefault(); if (historyIdx === -1) return; const newIdx = historyIdx + 1; if (newIdx >= inputHistory.length) { setHistoryIdx(-1); setInput(''); } else { setHistoryIdx(newIdx); setInput(inputHistory[newIdx]); } }
+              }} placeholder="Message… (↑↓ history)" disabled={busy} />
               <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={send} disabled={busy}>Send</button>
             </div>
           </footer>
