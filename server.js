@@ -6,6 +6,10 @@ const path = require('path');
 const config = require('./server/core/config');
 const security = require('./server/core/security');
 const db = require('./server/storage/db');
+const settings = require('./server/storage/settings');
+if (!global.__aegisDbOpened) {
+  try { require('fs').mkdirSync(config.DATA_DIR, { recursive: true }); db.open(require('path').join(config.DATA_DIR, 'aegisai.db')); db.migrateFromJson(config.DATA_DIR); global.__aegisDbOpened = true; } catch (e) { console.error('DB open failed:', e.message); }
+}
 const backends = require('./server/backends');
 const agent = require('./server/agent/run');
 const coding = require('./server/tools/coding');
@@ -166,9 +170,130 @@ const server = http.createServer(async (req, res) => {
       res.end();
       return;
     }
+    // ---------- Memory ----------
+    if (url === '/api/memory' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { memories: db.listMemories() });
+    }
+    if (url === '/api/memory/save' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (!body.text) return json(res, 400, { ok: false, error: 'text required' });
+      const id = db.saveMemory({ text: body.text, source: body.source || 'manual', tags: body.tags || [] });
+      return json(res, 200, { ok: true, id });
+    }
+    if (url === '/api/memory/delete' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      db.deleteMemory(body.id);
+      return json(res, 200, { ok: true });
+    }
+    // ---------- Skills ----------
+    if (url === '/api/skills' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { skills: db.listSkills() });
+    }
+    if (url === '/api/skills/save' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (!body.name) return json(res, 400, { ok: false, error: 'name required' });
+      db.saveSkill({ name: body.name, description: body.description || '', code: body.code || '' });
+      return json(res, 200, { ok: true });
+    }
+    if (url === '/api/skills/delete' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      db.deleteSkill(body.name);
+      return json(res, 200, { ok: true });
+    }
+    // ---------- Chats ----------
+    if (url === '/api/chats' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { chats: db.listChats() });
+    }
+    if (url.startsWith('/api/chats/') && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const id = url.split('/')[3];
+      const chat = db.getChat(id);
+      if (!chat) return json(res, 404, { ok: false, error: 'not found' });
+      return json(res, 200, chat);
+    }
+    if (url === '/api/chats' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const id = db.saveChat(body);
+      return json(res, 200, { ok: true, id });
+    }
+    if (url === '/api/chats/delete' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      db.deleteChat(body.id);
+      return json(res, 200, { ok: true });
+    }
+    if (url === '/api/chats/branch' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const parent = db.getChat(body.id);
+      if (!parent) return json(res, 404, { ok: false, error: 'parent not found' });
+      const idx = (typeof body.atIndex === 'number') ? body.atIndex : parent.messages.length;
+      const childMsgs = parent.messages.slice(0, idx);
+      const newId = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+      db.saveChat({ id: newId, title: (parent.title || 'Untitled') + ' (branch)', messages: childMsgs, parent_id: parent.id, branch_from: idx });
+      return json(res, 200, { ok: true, id: newId, parent_id: parent.id, branch_from: idx });
+    }
+    if (url === '/api/chats/branches' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      return json(res, 200, { branches: db.listBranches(body.id) });
+    }
+    // ---------- Stats ----------
+    if (url === '/api/stats' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const chats = db.listChats();
+      let total = 0, user = 0, assistant = 0, prompt = 0, gen = 0;
+      for (const c of chats) {
+        const full = db.getChat(c.id);
+        for (const m of (full.messages || [])) {
+          if (m.role === 'user' || m.role === 'assistant') { total++; if (m.role === 'user') user++; else assistant++; }
+          if (m.role === 'assistant' && m.tokenStats) { prompt += m.tokenStats.prompt || 0; gen += m.tokenStats.generated || 0; }
+        }
+      }
+      return json(res, 200, { messages: { total, user, assistant }, tokenUsage: { prompt, generated: gen }, chats: chats.length, memories: db.memoryCount(), skills: db.listSkills().length });
+    }
+    // ---------- Settings ----------
+    if (url === '/api/settings' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, settings.load());
+    }
+    if (url === '/api/settings' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      settings.save(body);
+      return json(res, 200, { ok: true });
+    }
+    // ---------- Backup ----------
+    if (url === '/api/backup' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const chats = db.listChats().map((c) => db.getChat(c.id));
+      return json(res, 200, { version: VERSION, chats, memories: db.listMemories(), skills: db.listSkills(), settings: settings.load() });
+    }
+    if (url === '/api/backup/import' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      for (const c of (body.chats || [])) db.saveChat(c);
+      for (const m of (body.memories || [])) db.saveMemory(m);
+      for (const s of (body.skills || [])) db.saveSkill(s);
+      if (body.settings) settings.save(body.settings);
+      return json(res, 200, { ok: true });
+    }
+    // ---------- RAG reindex (stub) ----------
+    if (url === '/api/rag/reindex' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { ok: true, message: 'reindex scheduled (stub)' });
+    }
     if (url.startsWith('/api/')) {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
-      return json(res, 404, { ok: false, error: 'not implemented in wave 1' });
+      return json(res, 404, { ok: false, error: 'not implemented in wave 4' });
     }
     serveStatic(req, res);
   } catch (e) {

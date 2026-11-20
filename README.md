@@ -8,8 +8,12 @@ This repository is the **next-generation** codebase. The legacy monolith remains
 
 ## Status
 
-- **Wave 0** (complete): scaffold, security primitives, SQLite storage, integration/tool-registry contracts, smoke tests.
-- Wave 1+: agent loop, backend adapter, GUI (Vite), integrations.
+- **v1.0.0** — all waves complete.
+- Wave 0: scaffold, security primitives, SQLite storage, integration/tool-registry contracts.
+- Wave 1: backend adapter, coding tools, agent loop, SSE route.
+- Wave 2: Vite + Preact + Tailwind GUI shell (chat, model select, settings).
+- Wave 3: integration plugins (REA, Ghidra, Craft, voice, awesome-re), capability security, status UI.
+- Wave 4: memory/skills/branching panels, export/import backup, stats, settings, RAG reindex stub.
 
 ## Quick start
 

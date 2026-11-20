@@ -1,6 +1,6 @@
 {
   "name": "aegisai-next",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "AegisAI (next) - modular rebuild: local AI web UI with Ollama backend, privacy-first, no telemetry.",
   "private": true,
   "scripts": {

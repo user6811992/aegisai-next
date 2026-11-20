@@ -10,6 +10,17 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [integrations, setIntegrations] = useState({});
+  const [tab, setTab] = useState('chat');
+  const [memories, setMemories] = useState([]);
+  const [skills, setSkills] = useState([]);
+  const [newMemory, setNewMemory] = useState('');
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillDesc, setNewSkillDesc] = useState('');
+  const [newSkillCode, setNewSkillCode] = useState('');
+  const [chatId, setChatId] = useState(null);
+
+  const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
+  const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
 
   useEffect(() => {
     fetch('/api/version').then((r) => r.json()).then((d) => setVersion(d.version)).catch(() => setVersion('?'));
@@ -19,6 +30,8 @@ export default function App() {
       if (ms.length && !model) setModel(ms[0]);
     }).catch(() => {});
     fetch('/api/integrations/status').then((r) => r.json()).then(setIntegrations).catch(() => {});
+    refreshMemory();
+    refreshSkills();
   }, []);
 
   async function send() {
@@ -70,11 +83,69 @@ export default function App() {
     }
   }
 
+  async function saveChat() {
+    const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Chat', messages }) });
+    const d = await r.json();
+    if (d.id) setChatId(d.id);
+  }
+
+  async function branchChat() {
+    if (!chatId) { await saveChat(); }
+    const id = chatId || (await (async () => { const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Chat', messages }) }); const d = await r.json(); setChatId(d.id); return d.id; })());
+    const r = await fetch('/api/chats/branch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, atIndex: messages.length }) });
+    const d = await r.json();
+    if (d.id) {
+      const cr = await fetch('/api/chats/' + d.id);
+      const cd = await cr.json();
+      setMessages(cd.messages || []);
+      setChatId(d.id);
+    }
+  }
+
+  async function addMemory() {
+    if (!newMemory.trim()) return;
+    await fetch('/api/memory/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: newMemory }) });
+    setNewMemory('');
+    refreshMemory();
+  }
+
+  async function delMemory(id) {
+    await fetch('/api/memory/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+    refreshMemory();
+  }
+
+  async function addSkill() {
+    if (!newSkillName.trim()) return;
+    await fetch('/api/skills/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSkillName, description: newSkillDesc, code: newSkillCode }) });
+    setNewSkillName(''); setNewSkillDesc(''); setNewSkillCode('');
+    refreshSkills();
+  }
+
+  async function delSkill(name) {
+    await fetch('/api/skills/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+    refreshSkills();
+  }
+
+  async function exportBackup() {
+    const r = await fetch('/api/backup');
+    const d = await r.json();
+    const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'aegisai-backup.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div class="min-h-screen bg-gray-50 text-gray-900 flex flex-col">
       <header class="bg-white border-b px-4 py-2 flex items-center gap-3">
         <h1 class="font-semibold text-lg">AegisAI (next)</h1>
         <span class="text-xs text-gray-500">v{version}</span>
+        <nav class="ml-4 flex gap-2">
+          {['chat', 'memory', 'skills'].map((t) => (
+            <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-100 text-blue-700' : 'text-gray-600'}`} onClick={() => setTab(t)}>{t}</button>
+          ))}
+        </nav>
         <div class="ml-auto flex items-center gap-2">
           <select class="border rounded px-2 py-1 text-sm" value={model} onChange={(e) => setModel(e.target.value)}>
             {models.map((m) => <option value={m}>{m}</option>)}
@@ -82,30 +153,66 @@ export default function App() {
           <button class="border rounded px-2 py-1 text-sm" onClick={() => setShowSettings((s) => !s)}>Settings</button>
         </div>
       </header>
-      <main class="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
-        {messages.map((m, i) => (
-          <div key={i} class={`rounded-lg p-3 ${m.role === 'user' ? 'bg-blue-50 ml-8' : 'bg-white border'}`}>
-            <div class="text-xs text-gray-500 mb-1">{m.role}</div>
-            <pre class="whitespace-pre-wrap text-sm">{m.content}</pre>
+
+      {tab === 'chat' && (
+        <>
+          <div class="px-4 py-1 flex gap-2 text-xs">
+            <button class="border rounded px-2 py-0.5" onClick={saveChat}>Save chat</button>
+            <button class="border rounded px-2 py-0.5" onClick={branchChat}>Branch</button>
           </div>
-        ))}
-        {busy && <div class="text-sm text-gray-400">Thinking…</div>}
-      </main>
-      <footer class="bg-white border-t p-3">
-        <div class="max-w-3xl mx-auto flex gap-2">
-          <input
-            class="flex-1 border rounded px-3 py-2 text-sm"
-            value={input}
-            onInput={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
-            placeholder="Message…"
-            disabled={busy}
-          />
-          <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={send} disabled={busy}>
-            Send
-          </button>
-        </div>
-      </footer>
+          <main class="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
+            {messages.map((m, i) => (
+              <div key={i} class={`rounded-lg p-3 ${m.role === 'user' ? 'bg-blue-50 ml-8' : 'bg-white border'}`}>
+                <div class="text-xs text-gray-500 mb-1">{m.role}</div>
+                <pre class="whitespace-pre-wrap text-sm">{m.content}</pre>
+              </div>
+            ))}
+            {busy && <div class="text-sm text-gray-400">Thinking…</div>}
+          </main>
+          <footer class="bg-white border-t p-3">
+            <div class="max-w-3xl mx-auto flex gap-2">
+              <input class="flex-1 border rounded px-3 py-2 text-sm" value={input} onInput={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Message…" disabled={busy} />
+              <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={send} disabled={busy}>Send</button>
+            </div>
+          </footer>
+        </>
+      )}
+
+      {tab === 'memory' && (
+        <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
+          <div class="flex gap-2">
+            <input class="flex-1 border rounded px-3 py-2 text-sm" value={newMemory} onInput={(e) => setNewMemory(e.target.value)} placeholder="New memory…" />
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={addMemory}>Add</button>
+          </div>
+          {memories.map((m) => (
+            <div key={m.id} class="bg-white border rounded p-3 flex justify-between items-start">
+              <div class="text-sm">{m.text}</div>
+              <button class="text-red-500 text-xs ml-2" onClick={() => delMemory(m.id)}>del</button>
+            </div>
+          ))}
+        </main>
+      )}
+
+      {tab === 'skills' && (
+        <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
+          <div class="space-y-2 border rounded p-3 bg-white">
+            <input class="w-full border rounded px-3 py-2 text-sm" value={newSkillName} onInput={(e) => setNewSkillName(e.target.value)} placeholder="Skill name" />
+            <input class="w-full border rounded px-3 py-2 text-sm" value={newSkillDesc} onInput={(e) => setNewSkillDesc(e.target.value)} placeholder="Description" />
+            <textarea class="w-full border rounded px-3 py-2 text-sm font-mono" rows="4" value={newSkillCode} onInput={(e) => setNewSkillCode(e.target.value)} placeholder="Code" />
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={addSkill}>Save skill</button>
+          </div>
+          {skills.map((s) => (
+            <div key={s.name} class="bg-white border rounded p-3 flex justify-between items-start">
+              <div>
+                <div class="font-medium text-sm">{s.name}</div>
+                <div class="text-xs text-gray-500">{s.description}</div>
+              </div>
+              <button class="text-red-500 text-xs ml-2" onClick={() => delSkill(s.name)}>del</button>
+            </div>
+          ))}
+        </main>
+      )}
+
       {showSettings && (
         <div class="fixed inset-0 bg-black/30 flex items-center justify-center" onClick={() => setShowSettings(false)}>
           <div class="bg-white rounded-lg p-4 w-96" onClick={(e) => e.stopPropagation()}>
@@ -119,7 +226,10 @@ export default function App() {
                 </li>
               ))}
             </ul>
-            <p class="text-xs text-gray-500 mt-3">Memory, skills, branching land in Wave 4.</p>
+            <div class="mt-3 flex gap-2">
+              <button class="border rounded px-3 py-1 text-sm" onClick={exportBackup}>Export backup</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
           </div>
         </div>
       )}
