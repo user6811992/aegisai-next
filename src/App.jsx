@@ -12,6 +12,16 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [integrations, setIntegrations] = useState({});
   const [tab, setTab] = useState('chat');
+  const [memories, setMemories] = useState([]);
+  const [skills, setSkills] = useState([]);
+  const [newMemory, setNewMemory] = useState('');
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillDesc, setNewSkillDesc] = useState('');
+  const [newSkillCode, setNewSkillCode] = useState('');
+  const [chatId, setChatId] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [parentId, setParentId] = useState(null);
+  const [cleanRoom, setCleanRoom] = useState(false);
   const [pullModel, setPullModel] = useState('');
   const [pulling, setPulling] = useState(false);
   const [pullMsg, setPullMsg] = useState('');
@@ -22,18 +32,8 @@ export default function App() {
   const [areQuery, setAreQuery] = useState('');
   const [areResults, setAreResults] = useState([]);
   const [areLoading, setAreLoading] = useState(false);
-  const [memories, setMemories] = useState([]);
-  const [skills, setSkills] = useState([]);
-  const [newMemory, setNewMemory] = useState('');
   const [ragQuery, setRagQuery] = useState('');
   const [ragResults, setRagResults] = useState([]);
-  const [newSkillName, setNewSkillName] = useState('');
-  const [newSkillDesc, setNewSkillDesc] = useState('');
-  const [newSkillCode, setNewSkillCode] = useState('');
-  const [chatId, setChatId] = useState(null);
-  const [cleanRoom, setCleanRoom] = useState(false);
-  const [branches, setBranches] = useState([]);
-  const [parentId, setParentId] = useState(null);
 
   const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
   const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
@@ -51,7 +51,6 @@ export default function App() {
   }, []);
 
   async function send() {
-    console.log('send() called, input:', input);
     if (!input.trim() || busy) return;
     const userMsg = { role: 'user', content: input };
     const next = [...messages, userMsg];
@@ -68,45 +67,27 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false, cleanRoom }),
       });
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const evt = JSON.parse(line.slice(6));
-            console.log('SSE:', evt.type, evt.final || evt.content || '');
-            if (evt.type === 'token') {
-              assistant.content += evt.content || '';
-              setMessages([...next, { ...assistant }]);
-            } else if (evt.type === 'tool_call') {
-              assistant.content += `\n🔧 ${evt.name}\n`;
-              setMessages([...next, { ...assistant }]);
-            } else if (evt.type === 'done') {
-              if (evt.final && !assistant.content) assistant.content = evt.final;
-              setMessages([...next, { ...assistant }]);
-            }
-          } catch (e) {}
+      const data = await res.json();
+      console.log('agent response:', data.final);
+      if (data.toolLog && data.toolLog.length) {
+        for (const t of data.toolLog) {
+          assistant.content += '\n🔧 ' + t.name + '\n';
         }
       }
+      assistant.content += (data.final || '');
+      setMessages([...next, { ...assistant }]);
+      // auto-save
+      try {
+        const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Chat', messages: [...next, assistant] }) });
+        const d = await r.json();
+        if (d.id) setChatId(d.id);
+      } catch (e) {}
     } catch (e) {
       console.error('send() error:', e);
       assistant.content = 'Error: ' + (e.message || e);
       setMessages([...next, { ...assistant }]);
     } finally {
       setBusy(false);
-      // auto-save chat
-      try {
-        const r = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Chat', messages: [...next, assistant] }) });
-        const d = await r.json();
-        if (d.id) setChatId(d.id);
-      } catch (e) {}
     }
   }
 
@@ -129,15 +110,6 @@ export default function App() {
     }
   }
 
-  async function loadBranches() {
-    if (!chatId) return;
-    try {
-      const r = await fetch('/api/chats/branches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) });
-      const d = await r.json();
-      setBranches(d.branches || []);
-    } catch (e) { setBranches([]); }
-  }
-
   async function navigateParent() {
     if (!chatId) return;
     const chat = await (await fetch('/api/chats/' + chatId)).json();
@@ -148,6 +120,15 @@ export default function App() {
       setChatId(chat.parent_id);
       setBranches([]);
     }
+  }
+
+  async function loadBranches() {
+    if (!chatId) return;
+    try {
+      const r = await fetch('/api/chats/branches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) });
+      const d = await r.json();
+      setBranches(d.branches || []);
+    } catch (e) { setBranches([]); }
   }
 
   async function addMemory() {
@@ -233,16 +214,16 @@ export default function App() {
               ))}
             </div>
           )}
-          <div class="px-4 py-1 flex gap-2 text-xs items-center">
-            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const t = prompt('Chat title:', 'Chat'); if (t) { await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId, title: t, messages }) }); alert('Renamed to ' + t); } }}>Rename</button>
+          <div class="px-4 py-1 flex gap-2 text-xs items-center flex-wrap">
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={() => { const t = prompt('Chat title:', 'Chat'); if (t) { fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId, title: t, messages }) }); } }}>Rename</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
-            <label class="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={cleanRoom} onChange={(e) => setCleanRoom(e.target.checked)} /> Clean room</label>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={navigateParent}>Parent</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={loadBranches}>Branches</button>
-            <button class="border border-gray-600 rounded px-2 py-0.5 text-red-400 hover:bg-gray-700" onClick={async () => { if (!chatId) { await saveChat(); } if (chatId && confirm('Delete this chat?')) { await fetch('/api/chats/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) }); setMessages([]); setChatId(null); } }}>Delete</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-red-400 hover:bg-gray-700" onClick={async () => { if (!chatId) await saveChat(); if (chatId && confirm('Delete this chat?')) { await fetch('/api/chats/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId }) }); setMessages([]); setChatId(null); } }}>Delete</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const blob = new Blob([JSON.stringify({ title: 'Chat', messages }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'chat.json'; a.click(); URL.revokeObjectURL(url); }}>Export</button>
-            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const u = prompt('URL or text to squeeze:'); if (!u) return; const q = prompt('Question:'); if (!q) return; const r = await fetch('/api/squeeze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u, question: q, model }) }); const d = await r.json(); if (d.ok) { setInput((prev) => (prev + '\\n' + d.answer).trim()); } else { alert('Squeeze failed: ' + (d.error || 'unknown')); } }}>Squeeze</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const u = prompt('URL or text to squeeze:'); if (!u) return; const q = prompt('Question:'); if (!q) return; const r = await fetch('/api/squeeze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u, question: q, model }) }); const d = await r.json(); if (d.ok) { setInput((prev) => (prev + '\n' + d.answer).trim()); } else { alert('Squeeze failed: ' + (d.error || 'unknown')); } }}>Squeeze</button>
+            <label class="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={cleanRoom} onChange={(e) => setCleanRoom(e.target.checked)} /> Clean room</label>
           </div>
           <main class="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
             {messages.map((m, i) => (
@@ -319,9 +300,11 @@ export default function App() {
                 <div class="font-medium text-sm text-gray-100">{s.name}</div>
                 <div class="text-xs text-gray-400">{s.description}</div>
               </div>
-              <button class="text-blue-400 text-xs ml-2" onClick={async () => { const desc = prompt('Description:', s.description); if (desc === null) return; const code = prompt('Code:', s.code); if (code === null) return; await fetch('/api/skills/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, description: desc, code }) }); refreshSkills(); }}>edit</button>
-              <button class="text-blue-400 text-xs ml-2" onClick={async () => { const r = await fetch('/api/skills/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, args: {} }) }); const d = await r.json(); alert(d.ok ? ('Result: ' + JSON.stringify(d.result)) : ('Error: ' + d.error)); }}>run</button>
-              <button class="text-red-400 text-xs ml-2" onClick={() => delSkill(s.name)}>del</button>
+              <div class="flex gap-1">
+                <button class="text-blue-400 text-xs" onClick={async () => { const desc = prompt('Description:', s.description); if (desc === null) return; const code = prompt('Code:', s.code); if (code === null) return; await fetch('/api/skills/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, description: desc, code }) }); refreshSkills(); }}>edit</button>
+                <button class="text-blue-400 text-xs" onClick={async () => { const r = await fetch('/api/skills/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, args: {} }) }); const d = await r.json(); alert(d.ok ? ('Result: ' + JSON.stringify(d.result)) : ('Error: ' + d.error)); }}>run</button>
+                <button class="text-red-400 text-xs" onClick={() => delSkill(s.name)}>del</button>
+              </div>
             </div>
           ))}
         </main>
@@ -350,17 +333,8 @@ export default function App() {
       {tab === 'models' && (
         <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
           <div class="flex gap-2">
-            <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={modelSearch} onInput={(e) => setModelSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') searchModels(); }} placeholder="Search models (HuggingFace + Ollama)…" />
-            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" disabled={modelSearching} onClick={async () => {
-              if (!modelSearch.trim()) return;
-              setModelSearching(true);
-              try {
-                const r = await fetch('/api/model-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: modelSearch }) });
-                const d = await r.json();
-                setModelSearchResults(d.results || []);
-              } catch (e) { setModelSearchResults([]); }
-              finally { setModelSearching(false); }
-            }}>{modelSearching ? 'Searching…' : 'Search'}</button>
+            <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={modelSearch} onInput={(e) => setModelSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { (async () => { if (!modelSearch.trim()) return; setModelSearching(true); try { const r = await fetch('/api/model-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: modelSearch }) }); const d = await r.json(); setModelSearchResults(d.results || []); } catch (e) { setModelSearchResults([]); } finally { setModelSearching(false); } })(); } }} placeholder="Search models (HuggingFace + Ollama)…" />
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" disabled={modelSearching} onClick={async () => { if (!modelSearch.trim()) return; setModelSearching(true); try { const r = await fetch('/api/model-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: modelSearch }) }); const d = await r.json(); setModelSearchResults(d.results || []); } catch (e) { setModelSearchResults([]); } finally { setModelSearching(false); } }}>{modelSearching ? 'Searching…' : 'Search'}</button>
           </div>
           {modelSearchResults.length > 0 && (
             <div class="space-y-1 max-h-60 overflow-auto">
@@ -417,50 +391,32 @@ export default function App() {
                   {s.note && <div class="text-xs text-gray-500 ml-2">{s.note}</div>}
                   {!s.ready && s.error && <div class="text-xs text-gray-500 ml-2">{s.error}</div>}
                   {name === 'rea' && (
-                    <button class="text-xs text-blue-400 ml-2 mt-1 cursor-pointer hover:underline block" onClick={async () => { const r = await fetch('/api/integrations/rea/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? 'REA updated' : ('Update failed: ' + (d.error || d.output || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update REA</button>
+                    <button class="text-xs text-blue-400 ml-2 mt-1 block cursor-pointer hover:underline" onClick={async () => { const r = await fetch('/api/integrations/rea/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? 'REA updated' : ('Update failed: ' + (d.error || d.output || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); }}>Update REA</button>
                   )}
                   {name === 'awesome-re' && (
-                    <button class="text-xs text-blue-400 ml-2 mt-1 cursor-pointer hover:underline" onClick={async () => { const r = await fetch('/api/integrations/awesome-re/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Index updated: ' + d.count + ' entries') : ('Update failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update index</button>
+                    <button class="text-xs text-blue-400 ml-2 mt-1 block cursor-pointer hover:underline" onClick={async () => { const r = await fetch('/api/integrations/awesome-re/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Index updated: ' + d.count + ' entries') : ('Update failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); }}>Update index</button>
                   )}
                   {name === 'ghidra' && (
                     <>
-                      {!s.ready && <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Ghidra MCP URL (e.g. http://127.0.0.1:8089):'); if (v) { await fetch('/api/integrations/ghidra/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'GHIDRA_MCP_URL', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); } }}>Configure</button>}
-                      <button class="text-xs text-green-400 ml-2 mt-1" onClick={async () => { if (!confirm('Download Ghidra + GhidrAssistMCP? (~500MB, may take a few minutes)')) return; const r = await fetch('/api/integrations/ghidra/install-mcp', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Installed to: ' + d.extracted) : ('Failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Install Ghidra+MCP</button>
-                      <button class="text-xs text-yellow-400 ml-2 mt-1" onClick={async () => { const r = await fetch('/api/integrations/ghidra/detect', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Detected MCP at ' + d.url) : 'No Ghidra MCP detected. Open Ghidra and enable the extension.'); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Detect MCP</button>
+                      {!s.ready && <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Ghidra MCP URL (e.g. http://127.0.0.1:8089):'); if (v) { await fetch('/api/integrations/ghidra/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'GHIDRA_MCP_URL', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); } }}>Configure</button>}
+                      <button class="text-xs text-green-400 ml-2 mt-1" onClick={async () => { if (!confirm('Download Ghidra + GhidrAssistMCP? (~500MB, may take a few minutes)')) return; const r = await fetch('/api/integrations/ghidra/install-mcp', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Installed to: ' + d.extracted) : ('Failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); }}>Install Ghidra+MCP</button>
+                      <button class="text-xs text-yellow-400 ml-2 mt-1" onClick={async () => { const r = await fetch('/api/integrations/ghidra/detect', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Detected MCP at ' + d.url) : 'No Ghidra MCP detected. Open Ghidra and enable the extension.'); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); }}>Detect MCP</button>
                       {s.installDir && <div class="text-xs text-gray-500 ml-2">Ghidra: {s.installDir}</div>}
                     </>
                   )}
-                  {name === 'craft' && !s.ready && (
+                  {name === 'craft' && (
                     <>
-                      <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Path to craft-anything-cli binary:'); if (v) { await fetch('/api/integrations/craft/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'CRAFT_BIN', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); } }}>Configure</button>
-                      <button class="text-xs text-green-400 ml-2 mt-1" onClick={async () => { if (!confirm('Download/build craft-anything? (may take a few minutes)')) return; const r = await fetch('/api/integrations/craft/install', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Installed: ' + d.binary) : ('Failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Install craft</button>
+                      {!s.ready && <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('Path to craft-anything-cli binary:'); if (v) { await fetch('/api/integrations/craft/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'CRAFT_BIN', value: v }) }); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); } }}>Configure</button>}
+                      <button class="text-xs text-green-400 ml-2 mt-1" onClick={async () => { if (!confirm('Download/build craft-anything? (may take a few minutes)')) return; const r = await fetch('/api/integrations/craft/install', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Installed: ' + d.binary) : ('Failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); }}>Install craft</button>
                       <button class="text-xs text-yellow-400 ml-2 mt-1" onClick={async () => { if (!confirm('Download and install Rust toolchain? (may take a few minutes)')) return; const r = await fetch('/api/integrations/craft/install-rust', { method: 'POST' }); const d = await r.json(); alert(d.ok ? 'Rust installed' : ('Failed: ' + (d.error || d.output || 'unknown'))); }}>Install Rust</button>
                     </>
                   )}
                   {name === 'voice' && (
-                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('STT_URL (leave blank to skip):'); const t = prompt('TTS_URL (leave blank to skip):'); await fetch('/api/integrations/voice/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'STT_URL', value: v || '' }) }); await fetch('/api/integrations/voice/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'TTS_URL', value: t || '' }) }); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Configure audio</button>
+                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const v = prompt('STT_URL (leave blank to skip):'); const t = prompt('TTS_URL (leave blank to skip):'); await fetch('/api/integrations/voice/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'STT_URL', value: v || '' }) }); await fetch('/api/integrations/voice/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ envKey: 'TTS_URL', value: t || '' }) }); const st = await (await fetch('/api/integrations/status')).json(); const b = await (await fetch('/api/backend')).json(); setIntegrations({ ...st, _backend: b }); }}>Configure audio</button>
                   )}
                 </li>
               ))}
             </ul>
-            <div class="mt-3 space-y-2">
-              <div class="flex items-center gap-2 text-sm text-gray-300">
-                <label>Tool budget:</label>
-                <input class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" type="number" defaultValue={64} onBlur={async (e) => { const s = await (await fetch('/api/settings')).json(); s.toolBudget = parseInt(e.target.value) || 64; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); }} />
-              </div>
-              <div class="flex items-center gap-2 text-sm text-gray-300">
-                <label><input type="checkbox" defaultChecked onChange={async (e) => { const s = await (await fetch('/api/settings')).json(); s.includeCoding = e.target.checked; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); }} /> Coding tools</label>
-                <label><input type="checkbox" defaultChecked onChange={async (e) => { const s = await (await fetch('/api/settings')).json(); s.includeRe = e.target.checked; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }); }} /> RE tools</label>
-              </div>
-              <div class="flex gap-2">
-                <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
-              <label class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer">
-                Import backup
-                <input type="file" accept="application/json" class="hidden" onChange={async (e) => { const f = e.target.files[0]; if (!f) return; const text = await f.text(); const data = JSON.parse(text); const r = await fetch('/api/backup/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const d = await r.json(); alert(d.ok ? 'Imported' : ('Failed: ' + (d.error || 'unknown'))); refreshMemory(); refreshSkills(); }} />
-              </label>
-              </div>
-            </div>
-            <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
             <div class="mt-3 text-xs text-gray-400 space-y-1">
               <div>Backend: <span class="text-gray-200">{(integrations._backend || {}).type || 'loading…'}</span> at <span class="text-gray-200">{(integrations._backend || {}).url || ''}</span></div>
             </div>
@@ -484,21 +440,18 @@ export default function App() {
                 setIntegrations({ ...st, _backend: b });
               }}>Apply</button>
             </div>
-            <div class="mt-2 flex gap-2">
-              <button class="text-xs text-blue-400" onClick={async () => { const r = await fetch('/api/versions'); const d = await r.json(); alert('AegisAI: ' + d.aegisai + '\\nNode: ' + d.node + '\\nOllama: ' + d.ollama + '\\nREA: ' + (d.rea && d.rea.toolCount) + ' tools'); }}>Check versions</button>
-              <button class="text-xs text-blue-400" onClick={async () => { const r = await fetch('/api/error-log'); const d = await r.json(); alert((d.content || '').slice(-1000) || 'No errors logged'); }}>View error log</button>
+            <div class="mt-3 flex gap-2">
+              <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/versions'); const d = await r.json(); alert('AegisAI: ' + d.aegisai + '\nNode: ' + d.node + '\nOllama: ' + d.ollama + '\nREA: ' + (d.rea && d.rea.toolCount) + ' tools'); }}>Check versions</button>
+              <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/error-log'); const d = await r.json(); alert((d.content || '').slice(-1000) || 'No errors logged'); }}>View error log</button>
             </div>
-            <div class="mt-3">
-              <div class="text-sm font-medium text-gray-200 mb-1">Pending actions</div>
-              <button class="text-xs text-blue-400" onClick={async () => {
-                const r = await fetch('/api/pending-actions'); const d = await r.json();
-                const acts = d.actions || [];
-                if (acts.length === 0) { alert('No pending actions'); return; }
-                const list = acts.map((a) => a.id + ' [' + a.status + '] ' + (a.name || '')).join('\\n');
-                const id = prompt('Pending actions:\\n' + list + '\\n\\nEnter action id to approve (or cancel):');
-                if (id) { await fetch('/api/pending-actions/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); alert('Approved ' + id); }
-              }}>Review pending</button>
+            <div class="mt-3 flex gap-2">
+              <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
+              <label class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer">
+                Import backup
+                <input type="file" accept="application/json" class="hidden" onChange={async (e) => { const f = e.target.files[0]; if (!f) return; const text = await f.text(); const data = JSON.parse(text); const r = await fetch('/api/backup/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const d = await r.json(); alert(d.ok ? 'Imported' : ('Failed: ' + (d.error || 'unknown'))); refreshMemory(); refreshSkills(); }} />
+              </label>
             </div>
+            <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
           </div>
         </div>
       )}

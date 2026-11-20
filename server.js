@@ -175,11 +175,6 @@ const server = http.createServer(async (req, res) => {
       let body;
       try { body = JSON.parse(await readBody(req) || '{}'); }
       catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      const send = (obj) => res.write('data: ' + JSON.stringify(obj) + '\\n\\n');
       // Gather external tools from available integrations.
       const avail = await integrations.registry.available();
       const ext = { ghidra: [], craft: [], are: [], rea: [] };
@@ -203,11 +198,9 @@ const server = http.createServer(async (req, res) => {
         allowedTools: body.allowedTools,
         deniedTools: body.deniedTools,
         externalTools: body.externalTools || ext,
-        onEvent: send,
+        onEvent: () => {},
       });
-      send({ type: 'done', final: result.final.final, toolLog: result.toolLog });
-      res.end();
-      return;
+      return json(res, 200, { ok: true, final: result.final.final, toolLog: result.toolLog });
     }
     // ---------- Memory ----------
     if (url === '/api/memory' && req.method === 'GET') {
