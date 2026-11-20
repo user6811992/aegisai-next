@@ -51,6 +51,7 @@ export default function App() {
   }, []);
 
   async function send() {
+    console.log('send() called, input:', input);
     if (!input.trim() || busy) return;
     const userMsg = { role: 'user', content: input };
     const next = [...messages, userMsg];
@@ -95,6 +96,7 @@ export default function App() {
         }
       }
     } catch (e) {
+      console.error('send() error:', e);
       assistant.content = 'Error: ' + (e.message || e);
       setMessages([...next, { ...assistant }]);
     } finally {
