@@ -230,7 +230,7 @@ export default function App() {
                   {s.note && <div class="text-xs text-gray-500 ml-2">{s.note}</div>}
                   {!s.ready && s.error && <div class="text-xs text-gray-500 ml-2">{s.error}</div>}
                   {name === 'rea' && (
-                    <button class="text-xs text-blue-400 ml-2 mt-1" onClick={async () => { const r = await fetch('/api/integrations/rea/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? 'REA updated' : ('Update failed: ' + (d.error || d.output || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update REA</button>
+                    <button class="text-xs text-blue-400 ml-2 mt-1 cursor-pointer hover:underline block" onClick={async () => { const r = await fetch('/api/integrations/rea/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? 'REA updated' : ('Update failed: ' + (d.error || d.output || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update REA</button>
                   )}
                   {name === 'awesome-re' && (
                     <button class="text-xs text-blue-400 ml-2 mt-1 cursor-pointer hover:underline" onClick={async () => { const r = await fetch('/api/integrations/awesome-re/update', { method: 'POST' }); const d = await r.json(); alert(d.ok ? ('Index updated: ' + d.count + ' entries') : ('Update failed: ' + (d.error || 'unknown'))); const st = await (await fetch('/api/integrations/status')).json(); setIntegrations(st); }}>Update index</button>
