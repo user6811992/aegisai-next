@@ -10,6 +10,8 @@ const settings = require('./server/storage/settings');
 if (!global.__aegisDbOpened) {
   try { require('fs').mkdirSync(config.DATA_DIR, { recursive: true }); db.open(require('path').join(config.DATA_DIR, 'aegisai.db')); db.migrateFromJson(config.DATA_DIR); global.__aegisDbOpened = true; } catch (e) { console.error('DB open failed:', e.message); }
 }
+// Seed default skills after a short delay
+setTimeout(() => { try { require('./server/storage/default-skills').ensureDefaultSkills(); } catch (e) { console.error('Skill seed failed:', e.message); } }, 3000);
 const backends = require('./server/backends');
 const agent = require('./server/agent/run');
 const coding = require('./server/tools/coding');
@@ -216,7 +218,7 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       if (!body.text) return json(res, 400, { ok: false, error: 'text required' });
-      const id = db.saveMemory({ text: body.text, source: body.source || 'manual', tags: body.tags || [] });
+      const id = db.saveMemory({ id: body.id, text: body.text, source: body.source || 'manual', tags: body.tags || [] });
       return json(res, 200, { ok: true, id });
     }
     if (url === '/api/memory/extract' && req.method === 'POST') {

@@ -1,5 +1,6 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
+import { marked } from 'marked';
 
 export default function App() {
   const [version, setVersion] = useState('...');
@@ -230,6 +231,7 @@ export default function App() {
             </div>
           )}
           <div class="px-4 py-1 flex gap-2 text-xs items-center">
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const t = prompt('Chat title:', 'Chat'); if (t) { await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId, title: t, messages }) }); alert('Renamed to ' + t); } }}>Rename</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
             <label class="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={cleanRoom} onChange={(e) => setCleanRoom(e.target.checked)} /> Clean room</label>
@@ -246,7 +248,7 @@ export default function App() {
                   <span>{m.role}</span>
                   {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
                 </div>
-                <div class="text-sm text-gray-100 whitespace-pre-wrap">{m.content}</div>
+                <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
               </div>
             ))}
             {busy && <div class="text-sm text-gray-400">Thinking…</div>}
@@ -277,7 +279,10 @@ export default function App() {
           {memories.map((m) => (
             <div key={m.id} class={`${card} p-3 flex justify-between items-start`}>
               <div class="text-sm text-gray-100">{m.text}</div>
-              <button class="text-red-400 text-xs ml-2" onClick={() => delMemory(m.id)}>del</button>
+              <div class="flex gap-1">
+                <button class="text-blue-400 text-xs" onClick={async () => { const t = prompt('Edit memory:', m.text); if (t !== null) { await fetch('/api/memory/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: m.id, text: t }) }); refreshMemory(); } }}>edit</button>
+                <button class="text-red-400 text-xs" onClick={() => delMemory(m.id)}>del</button>
+              </div>
             </div>
           ))}
           <div class="mt-4 space-y-2">
@@ -311,6 +316,7 @@ export default function App() {
                 <div class="font-medium text-sm text-gray-100">{s.name}</div>
                 <div class="text-xs text-gray-400">{s.description}</div>
               </div>
+              <button class="text-blue-400 text-xs ml-2" onClick={async () => { const desc = prompt('Description:', s.description); if (desc === null) return; const code = prompt('Code:', s.code); if (code === null) return; await fetch('/api/skills/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, description: desc, code }) }); refreshSkills(); }}>edit</button>
               <button class="text-blue-400 text-xs ml-2" onClick={async () => { const r = await fetch('/api/skills/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: s.name, args: {} }) }); const d = await r.json(); alert(d.ok ? ('Result: ' + JSON.stringify(d.result)) : ('Error: ' + d.error)); }}>run</button>
               <button class="text-red-400 text-xs ml-2" onClick={() => delSkill(s.name)}>del</button>
             </div>
@@ -445,6 +451,10 @@ export default function App() {
               </div>
               <div class="flex gap-2">
                 <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
+              <label class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer">
+                Import backup
+                <input type="file" accept="application/json" class="hidden" onChange={async (e) => { const f = e.target.files[0]; if (!f) return; const text = await f.text(); const data = JSON.parse(text); const r = await fetch('/api/backup/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const d = await r.json(); alert(d.ok ? 'Imported' : ('Failed: ' + (d.error || 'unknown'))); refreshMemory(); refreshSkills(); }} />
+              </label>
               </div>
             </div>
             <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
