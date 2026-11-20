@@ -13,12 +13,18 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [integrations, setIntegrations] = useState({});
   const [tab, setTab] = useState('chat');
+  const [pullModel, setPullModel] = useState('');
+  const [pulling, setPulling] = useState(false);
+  const [pullMsg, setPullMsg] = useState('');
+  const [scanResults, setScanResults] = useState([]);
   const [areQuery, setAreQuery] = useState('');
   const [areResults, setAreResults] = useState([]);
   const [areLoading, setAreLoading] = useState(false);
   const [memories, setMemories] = useState([]);
   const [skills, setSkills] = useState([]);
   const [newMemory, setNewMemory] = useState('');
+  const [ragQuery, setRagQuery] = useState('');
+  const [ragResults, setRagResults] = useState([]);
   const [newSkillName, setNewSkillName] = useState('');
   const [newSkillDesc, setNewSkillDesc] = useState('');
   const [newSkillCode, setNewSkillCode] = useState('');
@@ -121,6 +127,15 @@ export default function App() {
     refreshMemory();
   }
 
+  async function searchRag() {
+    if (!ragQuery.trim()) return;
+    try {
+      const r = await fetch('/api/rag/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: ragQuery, limit: 10 }) });
+      const d = await r.json();
+      setRagResults(d.results || []);
+    } catch (e) { setRagResults([]); }
+  }
+
   async function addSkill() {
     if (!newSkillName.trim()) return;
     await fetch('/api/skills/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSkillName, description: newSkillDesc, code: newSkillCode }) });
@@ -162,7 +177,7 @@ export default function App() {
         <h1 class="font-semibold text-lg text-white">AegisAI (next)</h1>
         <span class="text-xs text-gray-400">v{version}</span>
         <nav class="ml-4 flex gap-2">
-          {['chat', 'memory', 'skills', 'are'].map((t) => (
+          {['chat', 'memory', 'skills', 'are', 'models'].map((t) => (
             <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={() => setTab(t)}>{t}</button>
           ))}
         </nav>
@@ -185,7 +200,10 @@ export default function App() {
           <main class="flex-1 overflow-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
             {messages.map((m, i) => (
               <div key={i} class={`rounded-lg p-3 ${m.role === 'user' ? 'bg-blue-900/40 ml-8 border border-blue-800' : 'bg-gray-800 border border-gray-700'}`}>
-                <div class="text-xs text-gray-400 mb-1">{m.role}</div>
+                <div class="text-xs text-gray-400 mb-1 flex justify-between">
+                  <span>{m.role}</span>
+                  {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
+                </div>
                 <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(m.content || '')) }} />
               </div>
             ))}
@@ -193,6 +211,13 @@ export default function App() {
           </main>
           <footer class="bg-gray-800 border-t border-gray-700 p-3">
             <div class="max-w-3xl mx-auto flex gap-2">
+              <button class="border border-gray-600 rounded px-2 py-2 text-sm text-gray-200 hover:bg-gray-700" onClick={() => {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) { alert('Speech recognition not supported'); return; }
+                const rec = new SR();
+                rec.onresult = (e) => { setInput((prev) => (prev + ' ' + e.results[0][0].transcript).trim()); };
+                rec.start();
+              }}>🎤</button>
               <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={input} onInput={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Message…" disabled={busy} />
               <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={send} disabled={busy}>Send</button>
             </div>
@@ -212,6 +237,20 @@ export default function App() {
               <button class="text-red-400 text-xs ml-2" onClick={() => delMemory(m.id)}>del</button>
             </div>
           ))}
+          <div class="mt-4 space-y-2">
+            <div class="text-sm text-gray-300 font-medium">RAG search</div>
+            <div class="flex gap-2">
+              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={ragQuery} onInput={(e) => setRagQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') searchRag(); }} placeholder="Search memories by meaning…" />
+              <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={searchRag}>Search</button>
+              <button class="border border-gray-600 rounded px-3 py-2 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/rag/reindex', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }); const d = await r.json(); alert('Reindexed ' + (d.reindexed || 0) + '/' + (d.total || 0)); }}>Reindex</button>
+            </div>
+            {ragResults.map((r, i) => (
+              <div key={i} class="bg-gray-800 border border-gray-700 rounded p-2 text-sm text-gray-300">
+                {r.score !== undefined && <span class="text-xs text-gray-500 mr-2">{r.score.toFixed(3)}</span>}
+                {r.text}
+              </div>
+            ))}
+          </div>
         </main>
       )}
 
@@ -252,6 +291,34 @@ export default function App() {
             </div>
           ))}
           {areResults.length === 0 && areQuery && !areLoading && <div class="text-sm text-gray-500">No results. Try "Update index" in Settings first.</div>}
+        </main>
+      )}
+
+      {tab === 'models' && (
+        <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
+          <div class="flex gap-2">
+            <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={pullModel} onInput={(e) => setPullModel(e.target.value)} placeholder="Model name (e.g. llama3.2:3b)" />
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" disabled={pulling} onClick={async () => { if (!pullModel.trim()) return; setPulling(true); setPullMsg('Pulling...'); try { const r = await fetch('/api/pull-model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pullModel }) }); const d = await r.json(); setPullMsg(d.message || (d.ok ? 'Done' : 'Failed')); if (d.ok) { const mr = await fetch('/api/models'); const md = await mr.json(); setModels((md.models || []).map((m) => m.name)); } } catch (e) { setPullMsg('Error: ' + e.message); } finally { setPulling(false); } }}>{pulling ? 'Pulling…' : 'Pull'}</button>
+          </div>
+          {pullMsg && <div class="text-xs text-gray-400">{pullMsg}</div>}
+          <div class="text-sm text-gray-300 font-medium mt-2">Quick pull recommended:</div>
+          <div class="flex flex-wrap gap-2">
+            {['llama3.2:3b', 'qwen2.5-coder:7b', 'mistral:7b', 'nomic-embed-text', 'moondream'].map((m) => (
+              <button key={m} class="text-xs border border-gray-600 rounded px-2 py-1 text-gray-200 hover:bg-gray-700" onClick={() => setPullModel(m)}>{m}</button>
+            ))}
+          </div>
+          <div class="mt-3">
+            <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/scan-models'); const d = await r.json(); setScanResults(d.found || []); }}>Scan for models</button>
+          </div>
+          {scanResults.length > 0 && (
+            <div class="space-y-1">
+              {scanResults.map((s, i) => (
+                <div key={i} class="bg-gray-800 border border-gray-700 rounded p-2 text-xs text-gray-300">
+                  <span class="text-gray-400">{s.type}</span> — {s.label || s.path}
+                </div>
+              ))}
+            </div>
+          )}
         </main>
       )}
 

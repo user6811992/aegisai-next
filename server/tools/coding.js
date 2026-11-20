@@ -13,7 +13,7 @@ function isDangerousCmd(cmd) {
   return bad.some((r) => r.test(cmd));
 }
 
-function execCodingTool(name, args, projectRoot) {
+async function execCodingTool(name, args, projectRoot) {
   const a = args || {};
   switch (name) {
     case 'list_files': {
@@ -76,6 +76,24 @@ function execCodingTool(name, args, projectRoot) {
       try { fs.unlinkSync(tmp); } catch (e) {}
       return r;
     }
+    case 'web_search': {
+      const q = encodeURIComponent(a.query || '');
+      try {
+        const r = await fetch('https://html.duckduckgo.com/html/?q=' + q);
+        const html = await r.text();
+        const results = [];
+        const re = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/g;
+        let m;
+        while ((m = re.exec(html)) && results.length < (a.limit || 8)) {
+          const url = m[1];
+          const title = m[2].replace(/<[^>]*>/g, '').trim();
+          results.push(title + ' — ' + url);
+        }
+        return { ok: true, output: results.join('\\n') || '(no results)' };
+      } catch (e) {
+        return { ok: false, output: String(e.message || e) };
+      }
+    }
     default:
       return { ok: false, output: 'unknown tool: ' + name };
   }
@@ -90,6 +108,7 @@ const CODING_TOOLS = [
   { name: 'search_files', description: 'Search file contents by regex within the project root.', inputSchema: { type: 'object', properties: { pattern: { type: 'string' }, path: { type: 'string' }, flags: { type: 'string' }, limit: { type: 'number' } }, required: ['pattern'] } },
   { name: 'run_command', description: 'Run a shell command (no shell metacharacters) in the project root.', inputSchema: { type: 'object', properties: { command: { type: 'string' }, timeout: { type: 'number' } }, required: ['command'] } },
   { name: 'run_python', description: 'Run Python code.', inputSchema: { type: 'object', properties: { code: { type: 'string' }, timeout: { type: 'number' } }, required: ['code'] } },
+  { name: 'web_search', description: 'Search the web (DuckDuckGo).', inputSchema: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] } },
 ];
 
 function codingToolsAsOllama() {

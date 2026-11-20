@@ -313,9 +313,84 @@ const server = http.createServer(async (req, res) => {
       const data = await ar.refresh();
       return json(res, 200, { ok: true, count: Array.isArray(data) ? data.length : 0 });
     }
+    if (url === '/api/pull-model' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const name = (body.name || '').trim();
+      if (!name) return json(res, 400, { ok: false, error: 'Model name required' });
+      if (!security.isValidModelName(name)) return json(res, 400, { ok: false, error: 'Invalid model name' });
+      const backends = require('./server/backends');
+      if (backends.getType() !== 'ollama') return json(res, 400, { ok: false, error: 'Model pulling only supported for Ollama backend' });
+      const { runProcess } = require('./server/core/security');
+      const ollamaBin = process.platform === 'win32' ? (process.env.OLLAMA_BIN || 'ollama') : 'ollama';
+      const r = await runProcess(ollamaBin, ['pull', name], { timeout: 1800000, maxBuffer: 10 * 1024 * 1024, shell: true });
+      return json(res, 200, r.ok ? { ok: true, message: (r.out || 'done').trim().slice(0, 500) } : { ok: false, message: (r.out || r.err || ('exit code ' + r.code)).slice(0, 500) });
+    }
+    if (url === '/api/scan-models' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const fs = require('fs');
+      const path = require('path');
+      const home = process.env.USERPROFILE || process.env.HOME || '';
+      const found = [];
+      // Ollama model store
+      const ollamaModels = path.join(home, '.ollama', 'models');
+      try {
+        if (fs.statSync(ollamaModels).isDirectory()) {
+          found.push({ type: 'ollama-store', path: ollamaModels, label: 'Ollama model store' });
+        }
+      } catch (e) {}
+      // Scan common dirs for GGUF
+      const scanDirs = [home, 'C:\\Models', 'D:\\Models'];
+      const walk = (dir, depth) => {
+        if (depth > 3) return;
+        try {
+          for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, f.name);
+            if (f.isDirectory() && !f.name.startsWith('.') && f.name !== 'node_modules') walk(full, depth + 1);
+            else if (f.isFile() && f.name.endsWith('.gguf')) found.push({ type: 'gguf', path: full, label: f.name });
+          }
+        } catch (e) {}
+      };
+      for (const d of scanDirs) { try { if (fs.statSync(d).isDirectory()) walk(d, 0); } catch (e) {} }
+      return json(res, 200, { found });
+    }
+    if (url === '/api/rag/search' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const q = body.query || '';
+      // embed query
+      let qEmb = null;
+      try {
+        const er = await fetch((backends.getUrl() || 'http://127.0.0.1:11434') + '/api/embeddings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: body.embedModel || 'nomic-embed-text', prompt: q }) });
+        const ed = await er.json();
+        qEmb = ed.embedding;
+      } catch (e) {}
+      const mems = db.listMemories();
+      if (!qEmb) { return json(res, 200, { ok: true, results: mems.slice(0, 10) }); }
+      const scored = mems.map((m) => {
+        if (!m.embedding) return { m, score: 0 };
+        const a = qEmb, b = m.embedding;
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+        const score = (na && nb) ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+        return { m, score };
+      }).sort((x, y) => y.score - x.score).slice(0, body.limit || 10);
+      return json(res, 200, { ok: true, results: scored.map((s) => ({ ...s.m, score: s.score })) });
+    }
     if (url === '/api/rag/reindex' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
-      return json(res, 200, { ok: true, message: 'reindex scheduled (stub)' });
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const model = body.embedModel || 'nomic-embed-text';
+      const mems = db.listMemories();
+      let count = 0;
+      for (const m of mems) {
+        try {
+          const er = await fetch((backends.getUrl() || 'http://127.0.0.1:11434') + '/api/embeddings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model, prompt: m.text }) });
+          const ed = await er.json();
+          if (ed.embedding) { db.saveMemory({ ...m, embedding: ed.embedding }); count++; }
+        } catch (e) {}
+      }
+      return json(res, 200, { ok: true, reindexed: count, total: mems.length });
     }
     const cfgMatch = url.match(/^\/api\/integrations\/([^/]+)\/configure$/);
     if (cfgMatch && req.method === 'POST') {
