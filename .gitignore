@@ -14,6 +14,14 @@ error.log
 .env.*
 backend.txt
 
+# npm bin shims (created by global installs run from repo dir)
+rea
+rea.cmd
+rea.ps1
+rea-agents
+rea-agents.cmd
+rea-agents.ps1
+
 # build output
 dist/
 build/
