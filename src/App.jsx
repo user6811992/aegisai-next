@@ -244,7 +244,7 @@ export default function App() {
           ))}
         </nav>
         <div class="ml-auto flex items-center gap-2">
-          {(() => { const chars = messages.reduce((a, m) => a + (m.content || '').length, 0); const pct = Math.min(100, Math.round((chars / 4 / 8192) * 100)); return <div class="w-20 h-2 bg-gray-700 rounded overflow-hidden" title={'~' + Math.round(chars/4) + ' tokens'}><div class="h-full bg-blue-500" style={{ width: pct + '%' }} /></div>; })()}
+          {(() => { const chars = messages.reduce((a, m) => a + (m.content || '').length, 0); const pct = Math.min(100, Math.round((chars / 4 / 8192) * 100)); return <button class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200" onClick={() => alert('Context: ~' + Math.round(chars/4) + ' tokens (' + pct + '% of 8192)\\nMessages: ' + messages.length)} title="Click for details"><div class="w-16 h-2 bg-gray-700 rounded overflow-hidden"><div class="h-full bg-blue-500" style={{ width: pct + '%' }} /></div><span>{pct}%</span></button>; })()}
           <select class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" value={model} onChange={(e) => setModel(e.target.value)}>
             {models.map((m) => <option value={m}>{m}</option>)}
           </select>
