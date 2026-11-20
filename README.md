@@ -127,6 +127,32 @@ docker compose up -d
 
 Starts Ollama (port 11434) + AegisAI (port 8080). Data persists in named volumes.
 
+## Installer (Windows)
+
+Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
+
+```powershell
+.\installer\build.ps1
+```
+
+Output: `installer/output/AegisAI-Next-Setup-1.0.0.exe`
+
+## Installer (macOS)
+
+Requires `create-dmg` (`brew install create-dmg`):
+
+```bash
+bash installer/build-dmg.sh
+```
+
+## Installer (Linux)
+
+Requires `appimagetool`:
+
+```bash
+bash installer/build-appimage.sh
+```
+
 ## Development
 
 ```bash
