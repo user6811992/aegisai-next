@@ -392,6 +392,34 @@ const server = http.createServer(async (req, res) => {
       const r = await runProcess(ollamaBin, ['pull', name], { timeout: 1800000, maxBuffer: 10 * 1024 * 1024, shell: true });
       return json(res, 200, r.ok ? { ok: true, message: (r.out || 'done').trim().slice(0, 500) } : { ok: false, message: (r.out || r.err || ('exit code ' + r.code)).slice(0, 500) });
     }
+    if (url === '/api/model-search' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const q = (body.query || '').trim();
+      if (!q) return json(res, 200, { ok: true, results: [] });
+      const https = require('https');
+      const results = [];
+      // HuggingFace search (GGUF models)
+      try {
+        const hfUrl = 'https://huggingface.co/api/models?search=' + encodeURIComponent(q) + '&filter=gguf&sort=downloads&direction=-1&limit=15';
+        const data = await new Promise((resolve, reject) => {
+          https.get(hfUrl, { headers: { 'User-Agent': 'AegisAI' } }, (r) => {
+            let b = ''; r.on('data', c => b += c); r.on('end', () => resolve(b));
+          }).on('error', reject);
+        });
+        const arr = JSON.parse(data);
+        for (const m of (Array.isArray(arr) ? arr : [])) {
+          results.push({ source: 'huggingface', name: m.id, downloads: m.downloads, likes: m.likes, url: 'https://huggingface.co/' + m.id });
+        }
+      } catch (e) {}
+      // Ollama library: suggest ollama pull format (name:tag)
+      // Common Ollama models matching query
+      const ollamaSuggestions = ['llama3.2', 'qwen2.5', 'qwen2.5-coder', 'mistral', 'gemma2', 'phi3', 'deepseek-coder', 'codellama', 'llava', 'moondream'].filter((m) => m.includes(q.toLowerCase()));
+      for (const m of ollamaSuggestions) {
+        results.unshift({ source: 'ollama', name: m, url: 'https://ollama.com/library/' + m });
+      }
+      return json(res, 200, { ok: true, results });
+    }
     if (url === '/api/scan-models' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const fs = require('fs');

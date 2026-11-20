@@ -15,6 +15,9 @@ export default function App() {
   const [pulling, setPulling] = useState(false);
   const [pullMsg, setPullMsg] = useState('');
   const [scanResults, setScanResults] = useState([]);
+  const [modelSearch, setModelSearch] = useState('');
+  const [modelSearchResults, setModelSearchResults] = useState([]);
+  const [modelSearching, setModelSearching] = useState(false);
   const [areQuery, setAreQuery] = useState('');
   const [areResults, setAreResults] = useState([]);
   const [areLoading, setAreLoading] = useState(false);
@@ -338,6 +341,33 @@ export default function App() {
       {tab === 'models' && (
         <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
           <div class="flex gap-2">
+            <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={modelSearch} onInput={(e) => setModelSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') searchModels(); }} placeholder="Search models (HuggingFace + Ollama)…" />
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" disabled={modelSearching} onClick={async () => {
+              if (!modelSearch.trim()) return;
+              setModelSearching(true);
+              try {
+                const r = await fetch('/api/model-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: modelSearch }) });
+                const d = await r.json();
+                setModelSearchResults(d.results || []);
+              } catch (e) { setModelSearchResults([]); }
+              finally { setModelSearching(false); }
+            }}>{modelSearching ? 'Searching…' : 'Search'}</button>
+          </div>
+          {modelSearchResults.length > 0 && (
+            <div class="space-y-1 max-h-60 overflow-auto">
+              {modelSearchResults.map((r, i) => (
+                <div key={i} class="bg-gray-800 border border-gray-700 rounded p-2 text-xs flex justify-between items-center">
+                  <div>
+                    <span class="text-gray-400 mr-1">[{r.source}]</span>
+                    <span class="text-gray-200">{r.name}</span>
+                    {r.downloads && <span class="text-gray-500 ml-2">{r.downloads} dl</span>}
+                  </div>
+                  {r.source === 'ollama' && <button class="text-blue-400 hover:underline" onClick={() => setPullModel(r.name + ':latest')}>pull</button>}
+                </div>
+              ))}
+            </div>
+          )}
+          <div class="flex gap-2 mt-2">
             <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={pullModel} onInput={(e) => setPullModel(e.target.value)} placeholder="Model name (e.g. llama3.2:3b)" />
             <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" disabled={pulling} onClick={async () => { if (!pullModel.trim()) return; setPulling(true); setPullMsg('Pulling...'); try { const r = await fetch('/api/pull-model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pullModel }) }); const d = await r.json(); setPullMsg(d.message || (d.ok ? 'Done' : 'Failed')); if (d.ok) { const mr = await fetch('/api/models'); const md = await mr.json(); setModels((md.models || []).map((m) => m.name)); } } catch (e) { setPullMsg('Error: ' + e.message); } finally { setPulling(false); } }}>{pulling ? 'Pulling…' : 'Pull'}</button>
           </div>
