@@ -17,6 +17,7 @@ services:
       - BACKEND_TYPE=ollama
       - BACKEND_URL=http://ollama:11434
       - HOST=0.0.0.0
+      - AEGISAI_TOKEN=${AEGISAI_TOKEN:?set AEGISAI_TOKEN to a strong secret}
     volumes:
       - aegisai_data:/app/data
     depends_on:

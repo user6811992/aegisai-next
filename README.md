@@ -17,7 +17,7 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 - **Export/import** — full backup as JSON
 
 ### AI & Agents
-- **Agent tool-call loop** — automatic tool execution with SSE streaming
+- **Agent tool-call loop** — automatic tool execution with streaming responses
 - **Capability-based security** — scope MCP tools per session (allowedTools/deniedTools)
 - **Clean room mode** — AI works only from observable behavior
 - **Tool budget** — configurable (default 64 tools per request)
@@ -69,6 +69,7 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 git clone https://github.com/user6811992/aegisai-next.git
 cd aegisai-next
 npm install
+npm run build
 npm start
 ```
 

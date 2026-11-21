@@ -1,9 +1,14 @@
 // tests/wave4.test.js
-const { test, before, after } = require('node:test');
-const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+// Set data dir BEFORE requiring server.js so it is honored.
+const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-w4-'));
+process.env.AEGISAI_DATA_DIR = DATA_DIR;
+
+const { test, before, after } = require('node:test');
+const assert = require('node:assert/strict');
 
 const app = require('../server.js');
 
@@ -11,7 +16,6 @@ let serverInstance;
 let base;
 
 before(async () => {
-  process.env.AEGISAI_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-w4-'));
   serverInstance = app.server;
   await new Promise((resolve) => serverInstance.listen(0, '127.0.0.1', resolve));
   base = 'http://127.0.0.1:' + serverInstance.address().port;

@@ -42,16 +42,24 @@ async function execCodingTool(name, args, projectRoot) {
     }
     case 'search_files': {
       const root = security.safePath(projectRoot, a.path || '.');
-      const re = new RegExp(a.pattern || '', a.flags || 'i');
+      if (typeof a.pattern === 'string' && a.pattern.length > 500) return { ok: false, output: 'pattern too long' };
+      let re;
+      try { re = new RegExp(a.pattern || '', a.flags || 'i'); }
+      catch (e) { return { ok: false, output: 'invalid regex: ' + (e.message || e) }; }
       const results = [];
+      const MAX_FILE = 512 * 1024;
       const walk = (dir) => {
         for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
           const full = path.join(dir, e.name);
           if (e.isDirectory()) { walk(full); continue; }
+          let st;
+          try { st = fs.statSync(full); } catch (err) { continue; }
+          if (!st.isFile() || st.size > MAX_FILE) continue;
           try {
             const txt = fs.readFileSync(full, 'utf8');
             txt.split(/\r?\n/).forEach((line, i) => {
-              if (re.test(line)) results.push(`${path.relative(projectRoot, full)}:${i + 1}: ${line.trim()}`);
+              if (line.length > 4096) return;
+              if (re.test(line)) results.push(`${path.relative(projectRoot, full)}:${i + 1}: ${line.trim().slice(0, 300)}`);
             });
           } catch (err) {}
         }

@@ -49,6 +49,7 @@ async function runAgent(opts) {
     for (const t of (externalTools.ghidra || [])) extDefs.push({ src: 'ghidra', tool: t });
     for (const t of (externalTools.craft || [])) extDefs.push({ src: 'craft', tool: t });
     for (const t of (externalTools.are || [])) extDefs.push({ src: 'are', tool: t });
+    for (const t of (externalTools.rea || [])) extDefs.push({ src: 'rea', tool: t });
   }
   for (const { src, tool } of extDefs) {
     tools.push({
@@ -81,13 +82,13 @@ async function runAgent(opts) {
     onEvent({ type: 'status', message: 'calling model' });
     let resp;
     try {
-      resp = await backends.backendChat({ model, messages: msgs, tools, stream: false }, (e) => onEvent(e));
+      resp = await backends.backendChat({ model, messages: msgs, tools, stream: true }, (e) => onEvent(e));
     } catch (e) {
       // Retry without tools (vision models like moondream don't support tool calls)
       if (tools && tools.length > 0) {
         try {
           tools = [];
-          resp = await backends.backendChat({ model, messages: msgs, tools: [], stream: false }, (e) => onEvent(e));
+          resp = await backends.backendChat({ model, messages: msgs, tools: [], stream: true }, (e) => onEvent(e));
         } catch (e2) {
           return { final: { type: 'done', final: 'error: ' + (e2.message || e2), toolLog }, toolLog };
         }
@@ -136,12 +137,12 @@ async function runAgent(opts) {
           } else {
             result = { ok: false, output: 'REA not available' };
           }
-        } else if (name.startsWith('ghidra_') || name.startsWith('craft_') || name.startsWith('are_')) {
-          // external: simulate (MCP clients for these land later)
-          result = { ok: true, output: 'simulated: ' + name };
         } else if (name === 'are_search_reverse_engineered') {
           const ar = require('../integrations/awesome-re');
           result = { ok: true, output: JSON.stringify(ar.search(args.query, args.limit)) };
+        } else if (name.startsWith('ghidra_') || name.startsWith('craft_') || name.startsWith('are_')) {
+          // external: simulate (MCP clients for these land later)
+          result = { ok: true, output: 'simulated: ' + name };
         } else {
           result = await Promise.resolve(coding.execCodingTool(name, args, projectRoot));
         }

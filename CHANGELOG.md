@@ -1,0 +1,26 @@
+# Changelog
+
+## [1.1.0] - 2026-11-21
+
+### Fixed
+- Docker image build failed (`npm ci --omit=dev` then `npm run build`); now builds with dev deps then prunes.
+- Fresh clone served a blank page; added `npm run build` to Quick Start.
+- REA tools never reached the model; wired into agent tool definitions.
+- Awesome-RE search tool was unreachable (shadowed by simulated branch); reordered.
+- Editing a memory silently wiped its embedding; now preserved.
+- SQLite "database is locked" under concurrent opens; added `busy_timeout`.
+- `/api/squeeze` SSRF hole; added `isSafeUrl` guard.
+- Ghidra MCP install path traversal / shell injection; validated asset name and dropped shell.
+- Integration configure could set arbitrary env vars; added allowlist.
+- `/api/agent` now streams over SSE; frontend consumes the stream.
+- Service worker registration re-enabled.
+- Server refuses non-loopback bind without an auth token.
+- `search_files` ReDoS mitigations (pattern length, file/line size caps, invalid regex).
+- `serveStatic` and citation rendering no longer crash on malformed input.
+
+### Changed
+- README: dropped inaccurate "SSE streaming" wording (now accurate), added build step.
+- docker-compose requires `AEGISAI_TOKEN`.
+
+### Added
+- `static/icon.svg` PWA icon.

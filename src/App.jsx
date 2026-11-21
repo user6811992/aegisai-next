@@ -83,29 +83,58 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false, cleanRoom }),
       });
-      const data = await res.json();
-      console.log('agent response:', data.final);
-      if (data.toolLog && data.toolLog.length) {
-        setToolLog((prev) => [...prev, ...data.toolLog.map((t) => ({ ...t, ts: Date.now() }))]);
-        for (const t of data.toolLog) {
-          assistant.content += '\n🔧 ' + t.name + '\n';
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalData = null;
+      const toolLogAcc = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith('data:')) continue;
+          const payload = t.slice(5).trim();
+          if (!payload) continue;
+          let ev;
+          try { ev = JSON.parse(payload); } catch (e) { continue; }
+          if (ev.type === 'token') {
+            assistant.content += (ev.content || '');
+          } else if (ev.type === 'tool_call') {
+            toolLogAcc.push({ name: ev.name });
+            assistant.content += '\n🔧 ' + ev.name + '\n';
+          } else if (ev.type === 'done' && ev.final !== undefined) {
+            finalData = ev;
+          }
+          setMessages([...next, { ...assistant }]);
         }
       }
-      let finalText = data.final || '';
-      if (!finalText && !(data.toolLog && data.toolLog.length)) finalText = '[Model returned an empty response. Try a chat-capable model like llama3.2:3b or mistral:7b.]';
-      if (data.error) finalText = 'Error: ' + data.error;
-      assistant.content += finalText;
-      assistant.thinking = data.thinking || '';
-      const cites = [];
-      if (data.toolLog) {
-        for (const t of data.toolLog) {
+      if (finalData) {
+        let finalText = finalData.final || '';
+        if (!finalText && !(finalData.toolLog && finalData.toolLog.length) && !assistant.content.trim()) {
+          finalText = '[Model returned an empty response. Try a chat-capable model like llama3.2:3b or mistral:7b.]';
+        }
+        if (finalData.error) finalText = 'Error: ' + finalData.error;
+        if (finalText && !assistant.content.includes(finalText)) {
+          assistant.content += finalText;
+        }
+        assistant.thinking = finalData.thinking || '';
+        const tl = (finalData.toolLog && finalData.toolLog.length) ? finalData.toolLog : toolLogAcc;
+        if (tl && tl.length) {
+          setToolLog((prev) => [...prev, ...tl.map((t) => ({ ...t, ts: Date.now() }))]);
+        }
+        const cites = [];
+        for (const t of (tl || [])) {
           if (t.name === 'web_search') {
             const urls = (t.resultPreview || '').match(/https?:\/\/[^\s)]+/g) || [];
             cites.push(...urls);
           }
         }
+        assistant.citations = [...new Set(cites)].slice(0, 5);
       }
-      assistant.citations = [...new Set(cites)].slice(0, 5);
       setMessages([...next, { ...assistant }]);
       // auto-save
       try {
@@ -287,11 +316,15 @@ export default function App() {
                   </details>
                 )}
                 <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: (function() { try { const html = marked.parse(m.content || ''); return (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) ? DOMPurify.sanitize(html) : html; } catch (e) { return (m.content || '').replace(/</g, '&lt;'); } })() }} />
-                {m.citations && m.citations.length > 0 && (
+{m.citations && m.citations.length > 0 && (
                   <div class="mt-2 flex flex-wrap gap-1">
-                    {m.citations.map((c, i) => (
-                      <a key={i} href={c} target="_blank" class="text-xs text-blue-400 border border-blue-800 rounded px-2 py-0.5 hover:bg-blue-900/30">{new URL(c).hostname}</a>
-                    ))}
+                    {m.citations.map((c, i) => {
+                      let host = c;
+                      try { host = new URL(c).hostname; } catch (e) {}
+                      return (
+                        <a key={i} href={c} target="_blank" class="text-xs text-blue-400 border border-blue-800 rounded px-2 py-0.5 hover:bg-blue-900/30">{host}</a>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -25,10 +25,12 @@ function open(dbPath) {
   if (backend === 'better') {
     db = new DatabaseCtor(dbPath);
     db.pragma('journal_mode = WAL');
+    db.pragma('busy_timeout = 5000');
     db.pragma('foreign_keys = ON');
   } else {
     db = new DatabaseCtor(dbPath);
     db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA busy_timeout = 5000');
     db.exec('PRAGMA foreign_keys = ON');
   }
   db.exec(`
@@ -119,7 +121,16 @@ function saveMemory(m) {
   const id = m.id || ('m_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
   const existing = one('SELECT id FROM memories WHERE id = ?', [id]);
   if (existing) {
-    run('UPDATE memories SET text=?, source=?, tags=?, updated=?, embedding=? WHERE id=?', [m.text, m.source || 'manual', JSON.stringify(m.tags || []), new Date().toISOString(), m.embedding ? JSON.stringify(m.embedding) : null, id]);
+    // Preserve an existing embedding unless the caller explicitly passes one
+    // (including null to clear it). `undefined` means "leave as-is".
+    let embeddingToStore;
+    if (m.embedding === undefined) {
+      const cur = one('SELECT embedding FROM memories WHERE id = ?', [id]);
+      embeddingToStore = cur ? cur.embedding : null;
+    } else {
+      embeddingToStore = m.embedding ? JSON.stringify(m.embedding) : null;
+    }
+    run('UPDATE memories SET text=?, source=?, tags=?, updated=?, embedding=? WHERE id=?', [m.text, m.source || 'manual', JSON.stringify(m.tags || []), new Date().toISOString(), embeddingToStore, id]);
   } else {
     run('INSERT INTO memories (id, text, source, tags, created, embedding) VALUES (?,?,?,?,?,?)', [id, m.text, m.source || 'manual', JSON.stringify(m.tags || []), m.created || new Date().toISOString(), m.embedding ? JSON.stringify(m.embedding) : null]);
   }

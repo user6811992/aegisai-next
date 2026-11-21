@@ -1,6 +1,7 @@
 // server/core/security.js
 // Process-safety and path-safety primitives. Ported from the legacy monolith.
-// These are the most security-critical helpers in the codebase; do not weaken.
+// runProcess uses execFile (no shell) by default; callers that need a shell must
+// pass shell:true explicitly and are responsible for sanitizing their inputs.
 
 const fs = require('fs');
 const path = require('path');

@@ -49,7 +49,9 @@ const MIME = {
 };
 
 function serveStatic(req, res) {
-  const urlPath = decodeURIComponent(req.url.split('?')[0]);
+  let urlPath;
+  try { urlPath = decodeURIComponent(req.url.split('?')[0]); }
+  catch (e) { res.statusCode = 400; res.end('bad request'); return; }
   let safe = path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, '');
   if (safe === path.sep || safe === '/' || safe === '\\' || safe === '.') safe = 'index.html';
   const filePath = path.join(PUBLIC_DIR, safe);
@@ -187,6 +189,13 @@ const server = http.createServer(async (req, res) => {
       }
       // REA tools namespaced as rea_ in agent; map them into ext.rea (already).
       const s = settings.load();
+      // Server-Sent Events stream
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      const send = (obj) => { try { res.write('data: ' + JSON.stringify(obj) + '\n\n'); } catch (e) {} };
       const result = await agent.runAgent({
         model: body.model,
         messages: body.messages || [],
@@ -198,9 +207,11 @@ const server = http.createServer(async (req, res) => {
         allowedTools: body.allowedTools,
         deniedTools: body.deniedTools,
         externalTools: body.externalTools || ext,
-        onEvent: () => {},
+        onEvent: (e) => send(e),
       });
-      return json(res, 200, { ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog });
+      send({ type: 'done', ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog });
+      res.end();
+      return;
     }
     // ---------- Memory ----------
     if (url === '/api/memory' && req.method === 'GET') {
@@ -541,6 +552,7 @@ const server = http.createServer(async (req, res) => {
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       let text = body.text || '';
       if (body.url) {
+        if (!security.isSafeUrl(body.url)) return json(res, 400, { ok: false, error: 'unsafe url' });
         try {
           const r = await fetch(body.url);
           text = await r.text();
@@ -623,8 +635,14 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const name = cfgMatch[1];
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const ALLOWED_ENV_KEYS = new Set(['BACKEND_TYPE','BACKEND_URL','OLLAMA_URL','BACKEND_API_KEY','STT_URL','TTS_URL','GITHUB_TOKEN','GHIDRA_MCP_URL','CRAFT_BIN','REA_BIN','OLLAMA_BIN']);
       const cfg = intConfig.load();
-      if (body.envKey) { cfg[body.envKey] = body.value || ''; intConfig.save(cfg); intConfig.apply({ [body.envKey]: body.value || '' }); }
+      if (body.envKey) {
+        if (!ALLOWED_ENV_KEYS.has(body.envKey)) return json(res, 400, { ok: false, error: 'env key not allowed' });
+        cfg[body.envKey] = body.value || '';
+        intConfig.save(cfg);
+        intConfig.apply({ [body.envKey]: body.value || '' });
+      }
       const st = await integrations.registry.statusAll();
       return json(res, 200, { ok: true, status: st[name] });
     }
@@ -759,7 +777,10 @@ const server = http.createServer(async (req, res) => {
         });
         const rel = JSON.parse(releaseJson);
         const asset = (rel.assets || []).find(a => a.name.endsWith('.zip'));
-        if (asset) { assetUrl = asset.browser_download_url; assetName = asset.name; }
+        const sec = require('./server/core/security');
+        if (asset && /^[A-Za-z0-9._-]+\.zip$/.test(asset.name) && sec.isSafeUrl(asset.browser_download_url)) {
+          assetUrl = asset.browser_download_url; assetName = asset.name;
+        }
       } catch (e) {}
       if (!assetUrl) {
         const st = await integrations.registry.statusAll();
@@ -780,7 +801,7 @@ const server = http.createServer(async (req, res) => {
       const { runProcess } = require('./server/core/security');
       const psBin = process.platform === 'win32' ? 'powershell.exe' : 'powershell';
       fs.mkdirSync(extractDir, { recursive: true });
-      const r = await runProcess(psBin, ['-Command', 'Expand-Archive -Path \"' + zipPath + '\" -DestinationPath \"' + extractDir + '\" -Force'], { timeout: 300000, shell: true });
+      const r = await runProcess(psBin, ['-NoProfile', '-Command', 'Expand-Archive -Path "' + zipPath + '" -DestinationPath "' + extractDir + '" -Force'], { timeout: 300000 });
       // Find ghidraRun in extracted dir
       let ghidraDir = null;
       const walk = (d) => {
@@ -839,6 +860,11 @@ const server = http.createServer(async (req, res) => {
 
 async function start() {
   try { await backends.detectBackend(); } catch (e) {}
+  const isLoopback = HOST === '127.0.0.1' || HOST === 'localhost' || HOST === '::1';
+  if (!isLoopback && !TOKEN) {
+    console.error('Refusing to start: binding to a non-loopback address (' + HOST + ') without an auth token. Set LOCALAI_TOKEN/AEGISAI_TOKEN.');
+    process.exit(1);
+  }
   server.listen(PORT, HOST, () => {
     console.log(`AegisAI (next) v${VERSION} listening on http://${HOST}:${PORT}`);
     try { require('./server/integrations/rea').init().then(() => console.log('REA init done:', require('./server/integrations/rea').integration.status())).catch(() => {}); } catch (e) {}

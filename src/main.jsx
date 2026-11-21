@@ -3,10 +3,10 @@ import { useState, useEffect } from 'preact/hooks';
 import './styles.css';
 import App from './App.jsx';
 
-// Service worker temporarily disabled for debugging
-// if ('serviceWorker' in navigator) {
-//   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
-// }
+// Service worker registration (pass-through; unregisters stale caches on install)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
 
 try {
   render(<App />, document.getElementById('app'));
