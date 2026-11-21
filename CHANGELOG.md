@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.47] - 2026-11-21
+
+### Added
+- Conversation templates: save current input as template, select from dropdown.
+
 ## [1.1.46] - 2026-11-21
 
 ### Changed

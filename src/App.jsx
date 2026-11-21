@@ -50,6 +50,9 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [loadingChats, setLoadingChats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [templates, setTemplates] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('aegisai_templates') || '[]'); } catch (e) { return []; }
+  });
   const [theme, setTheme] = useState(localStorage.getItem('aegisai_theme') || 'dark');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingPulling, setOnboardingPulling] = useState(false);
@@ -509,6 +512,13 @@ export default function App() {
                 rec.start();
               }}>🎤</button>
               <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={() => send()} disabled={busy}>Send</button>
+              {templates.length > 0 && (
+                <select class="bg-gray-700 border border-gray-600 rounded px-2 py-2 text-xs text-gray-100" onChange={(e) => { const t = templates[parseInt(e.target.value)]; if (t) setInput(t.prompt || ''); e.target.value = ''; }}>
+                  <option value="">📋 Templates</option>
+                  {templates.map((t, i) => <option value={i}>{t.name}</option>)}
+                </select>
+              )}
+              <button class="bg-gray-700 text-gray-200 rounded px-2 py-2 text-xs hover:bg-gray-600" title="Save current input as template" onClick={() => { if (!input.trim()) return; const name = prompt('Template name:'); if (!name) return; const next = [...templates, { name, prompt: input }]; setTemplates(next); localStorage.setItem('aegisai_templates', JSON.stringify(next)); }}>Save tpl</button>
               {busy && <button class="bg-red-600 text-white rounded px-4 py-2 text-sm" onClick={() => abortCtrl?.abort()}>Stop</button>}
             </div>
           </footer>
