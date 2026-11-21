@@ -2,6 +2,10 @@
 // Minimal plugin loader. Plugins live in <DATA_DIR>/plugins/<name>/ with a
 // manifest.json ({ name, version, description, entry }) and an entry module
 // exporting init(app) and optionally tools().
+//
+// SECURITY NOTE: Plugins run in the same Node.js process with full access to
+// the application, filesystem, and environment. Only install plugins from
+// trusted sources. There is no sandboxing.
 const fs = require('fs');
 const path = require('path');
 const { DATA_DIR } = require('./config');

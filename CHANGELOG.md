@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.33] - 2026-11-21
+
+### Fixed
+- Plugin loader now documents security implications (plugins run in-process).
+- Light theme CSS expanded with more component overrides.
+
 ## [1.1.32] - 2026-11-21
 
 ### Added
