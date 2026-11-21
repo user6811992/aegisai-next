@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.35] - 2026-11-21
+
+### Fixed
+- Wired metrics counter into request handler (http_requests_total now increments).
+
 ## [1.1.34] - 2026-11-21
 
 ### Added

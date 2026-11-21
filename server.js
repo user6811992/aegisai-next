@@ -133,6 +133,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const rl = require('./server/core/ratelimit');
     if (!rl.check(req, res)) return;
+    try { require('./server/core/metrics').inc('http_requests_total'); } catch (e) {}
     const url = req.url.split('?')[0];
     // Health check (no auth, for Docker/K8s probes).
     if (url === '/api/health' && req.method === 'GET') {
