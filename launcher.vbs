@@ -13,6 +13,12 @@ If appPort = "%PORT%" Or appPort = "" Then appPort = "8080"
 base = fso.GetParentFolderName(WScript.ScriptFullName)
 If base = "" Then base = wshShell.ExpandEnvironmentStrings("%USERPROFILE%") & "\Documents\aegisai-next"
 
+' Guard against quote injection in paths
+If InStr(base, """") > 0 Then
+  MsgBox "Invalid installation path.", vbCritical, "AegisAI (next) Launcher"
+  WScript.Quit 1
+End If
+
 ' Discover Node.js
 Dim nodeExe
 nodeExe = ""

@@ -28,7 +28,9 @@ async function execCodingTool(name, args, projectRoot) {
       const p = security.safePath(projectRoot, a.path);
       const st = fs.statSync(p);
       if (st.size > 2 * 1024 * 1024) return { ok: false, output: 'file too large (>2MB)' };
-      const content = fs.readFileSync(p, 'utf8');
+      const buf = fs.readFileSync(p);
+      if (buf.includes(0)) return { ok: false, output: 'binary file (' + st.size + ' bytes) - cannot display as text' };
+      const content = buf.toString('utf8');
       const max = a.maxBytes || 200000;
       return { ok: true, output: content.slice(0, max) };
     }
@@ -77,7 +79,25 @@ async function execCodingTool(name, args, projectRoot) {
       const cmd = a.command;
       if (isDangerousCmd(cmd)) return { ok: false, output: 'BLOCKED: dangerous command' };
       if (/[;&|`$()<>]/.test(cmd)) return { ok: false, output: 'BLOCKED: shell metacharacters not allowed' };
-      const parts = cmd.trim().split(/\s+/);
+      // Quote-aware split so arguments containing spaces survive.
+      const parts = [];
+      let cur = '';
+      let quote = null;
+      for (let i = 0; i < cmd.length; i++) {
+        const ch = cmd[i];
+        if (quote) {
+          if (ch === quote) { quote = null; }
+          else { cur += ch; }
+        } else if (ch === '"' || ch === "'") {
+          quote = ch;
+        } else if (/\s/.test(ch)) {
+          if (cur) { parts.push(cur); cur = ''; }
+        } else {
+          cur += ch;
+        }
+      }
+      if (cur) parts.push(cur);
+      if (parts.length === 0) return { ok: false, output: 'BLOCKED: empty command' };
       // On Windows, .cmd/.bat shims (npm, npx, ...) require a shell to execute.
       const useShell = process.platform === 'win32';
       return security.runProcess(parts[0], parts.slice(1), { cwd: projectRoot, timeout: a.timeout || 60000, shell: useShell });

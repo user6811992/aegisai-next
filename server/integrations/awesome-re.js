@@ -27,7 +27,7 @@ async function refresh() {
       if (process.env.GITHUB_TOKEN) headers['Authorization'] = 'token ' + process.env.GITHUB_TOKEN;
       let hops = 0;
       const doGet = (u) => {
-        https.get(u, { headers }, (r) => {
+        const req = https.get(u, { headers }, (r) => {
           if ([301,302,303,307,308].includes(r.statusCode) && r.headers.location && hops < 5) {
             hops += 1; r.resume();
             let next; try { next = new URL(r.headers.location, u).toString(); } catch (e) { return reject(e); }
@@ -37,7 +37,9 @@ async function refresh() {
           let b = '';
           r.on('data', (c) => { if (b.length > 50 * 1024 * 1024) { reject(new Error('too large')); r.destroy(); return; } b += c; });
           r.on('end', () => resolve(b));
-        }).on('error', reject);
+        });
+        req.on('error', reject);
+        req.setTimeout(30000, () => { req.destroy(); reject(new Error('timeout')); });
       };
       doGet(ARE_DATA_URL);
     });

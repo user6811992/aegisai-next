@@ -140,7 +140,7 @@ Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 .\installer\build.ps1
 ```
 
-Output: `installer/output/AegisAI-Next-Setup-1.1.7.exe`
+Output: `installer/output/AegisAI-Next-Setup-1.1.8.exe`
 
 ## Installer (macOS)
 

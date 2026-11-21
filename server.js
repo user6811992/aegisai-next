@@ -466,9 +466,11 @@ const server = http.createServer(async (req, res) => {
       try {
         const hfUrl = 'https://huggingface.co/api/models?search=' + encodeURIComponent(q) + '&filter=gguf&sort=downloads&direction=-1&limit=15';
         const data = await new Promise((resolve, reject) => {
-          https.get(hfUrl, { headers: { 'User-Agent': 'AegisAI' } }, (r) => {
-            let b = ''; r.on('data', c => b += c); r.on('end', () => resolve(b));
-          }).on('error', reject);
+          const req = https.get(hfUrl, { headers: { 'User-Agent': 'AegisAI' } }, (r) => {
+            let b = ''; r.on('data', c => { if (b.length > 2 * 1024 * 1024) { reject(new Error('too large')); r.destroy(); return; } b += c; }); r.on('end', () => resolve(b));
+          });
+          req.on('error', reject);
+          req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')); });
         });
         const arr = JSON.parse(data);
         for (const m of (Array.isArray(arr) ? arr : [])) {

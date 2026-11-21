@@ -27,7 +27,7 @@ function findGhidraInstall() {
 
 async function probePort(port) {
   return new Promise((resolve) => {
-    const req = http.get('http://127.0.0.1:' + port + '/', (res) => { resolve(res.statusCode < 500); });
+    const req = http.get('http://127.0.0.1:' + port + '/', (res) => { resolve(res.statusCode >= 200 && res.statusCode < 400); });
     req.on('error', () => resolve(false));
     req.setTimeout(1000, () => { req.destroy(); resolve(false); });
   });
