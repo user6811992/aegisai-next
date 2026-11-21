@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.37] - 2026-11-21
+
+### Fixed
+- Re-added legacy localStorage token migration to httpOnly cookie (one-time, clears after).
+- Documented clustering + SQLite WAL concurrency limitation.
+- Metrics in-memory persistence documented (acceptable for Prometheus).
+
 ## [1.1.36] - 2026-11-21
 
 ### Added

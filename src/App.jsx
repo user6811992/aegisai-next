@@ -30,6 +30,8 @@ function friendlyError(e) {
 
 // Auth via httpOnly cookies (set by /api/login). Cookies sent automatically
 // with credentials: 'include'. No localStorage token (XSS-safe).
+// One-time migration: if a legacy localStorage token exists, exchange it for
+// an httpOnly cookie and clear localStorage.
 const _origFetch = (typeof window !== 'undefined' && window.fetch) ? window.fetch.bind(window) : null;
 if (_origFetch) {
   window.fetch = (input, init) => {
@@ -37,6 +39,16 @@ if (_origFetch) {
     init.credentials = 'include';
     return _origFetch(input, init);
   };
+}
+// Migrate legacy localStorage token to httpOnly cookie (runs once).
+if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+  const legacy = localStorage.getItem('aegisai_token');
+  if (legacy) {
+    fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: legacy }), credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => { if (d.ok) localStorage.removeItem('aegisai_token'); })
+      .catch(() => {});
+  }
 }
 
 export default function App() {

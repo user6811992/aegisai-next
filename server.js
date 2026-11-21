@@ -1207,6 +1207,8 @@ async function start() {
 }
 
 // Clustering support: set AEGISAI_CLUSTER=1 to fork workers (one per CPU).
+// NOTE: With SQLite (WAL mode), concurrent writes serialize. For write-heavy
+// workloads, use a single process. Clustering is best for read-heavy / CPU-bound tasks.
 if (process.env.AEGISAI_CLUSTER === '1' && require('cluster').isPrimary) {
   const cluster = require('cluster');
   const os = require('os');
