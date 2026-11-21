@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.12] - 2026-11-21
+
+### Fixed
+- `run_command` on Windows now passes the whole guarded command string to the shell, preserving quoted arguments with spaces.
+
 ## [1.1.11] - 2026-11-21
 
 ### Fixed

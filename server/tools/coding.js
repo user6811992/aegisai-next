@@ -99,8 +99,13 @@ async function execCodingTool(name, args, projectRoot) {
       if (cur) parts.push(cur);
       if (parts.length === 0) return { ok: false, output: 'BLOCKED: empty command' };
       // On Windows, .cmd/.bat shims (npm, npx, ...) require a shell to execute.
+      // Pass the whole (already-guarded) command string to the shell so quoted
+      // arguments with spaces survive instead of being re-split.
       const useShell = process.platform === 'win32';
-      return security.runProcess(parts[0], parts.slice(1), { cwd: projectRoot, timeout: a.timeout || 60000, shell: useShell });
+      if (useShell) {
+        return security.runProcess(cmd, [], { cwd: projectRoot, timeout: a.timeout || 60000, shell: true });
+      }
+      return security.runProcess(parts[0], parts.slice(1), { cwd: projectRoot, timeout: a.timeout || 60000, shell: false });
     }
     case 'run_python': {
       const code = String(a.code || '');
