@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.52] - 2026-11-21
+
+### Changed
+- Enhanced mobile-responsive CSS with comprehensive breakpoints and touch targets.
+
 ## [1.1.51] - 2026-11-21
 
 ### Added
