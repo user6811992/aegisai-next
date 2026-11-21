@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.46] - 2026-11-21
+
+### Changed
+- Enhanced mobile-responsive CSS with comprehensive breakpoints and touch targets.
+- Added JSDoc annotations to capabilities.js.
+
 ## [1.1.45] - 2026-11-21
 
 ### Added

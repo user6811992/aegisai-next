@@ -9,6 +9,14 @@ function matches(name, pattern) {
   return name === pattern;
 }
 
+/**
+ * Capability-based tool filtering per agent session.
+ * @param {Array} tools - Tool definitions
+ * @param {object} opts - Filter options
+ * @param {string[]} [opts.allowedTools] - Allowed tool name patterns
+ * @param {string[]} [opts.deniedTools] - Denied tool name patterns
+ * @returns {Array} Filtered tools
+ */
 function filterTools(tools, opts) {
   const allowed = opts && opts.allowedTools;
   const denied = opts && opts.deniedTools;
