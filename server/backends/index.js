@@ -11,6 +11,34 @@ const state = {
   explicit: !!(process.env.BACKEND_TYPE || process.env.BACKEND_URL || process.env.OLLAMA_URL),
 };
 
+// Merge streamed tool-call fragments by index. OpenAI-style streaming sends
+// function.arguments in pieces; Ollama usually sends a complete call in one
+// chunk. Overwriting would lose fragmented arguments.
+function mergeToolCalls(existing, incoming) {
+  if (!incoming) return existing;
+  const parts = Array.isArray(incoming) ? incoming : [incoming];
+  const out = Array.isArray(existing) ? existing.map((x) => Object.assign({}, x)) : [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i] || {};
+    const idx = (typeof part.index === 'number') ? part.index : i;
+    if (!out[idx]) out[idx] = {};
+    const target = out[idx];
+    if (part.id) target.id = part.id;
+    if (part.type) target.type = part.type;
+    const pf = part.function || part;
+    if (!target.function) target.function = {};
+    if (pf.name) target.function.name = pf.name;
+    if (pf.arguments !== undefined) {
+      if (typeof pf.arguments === 'string') {
+        target.function.arguments = (target.function.arguments || '') + pf.arguments;
+      } else {
+        target.function.arguments = pf.arguments;
+      }
+    }
+  }
+  return out.filter(Boolean);
+}
+
 function getType() { return state.type; }
 function getUrl() { return state.url; }
 function setBackend(type, url) {
@@ -112,7 +140,7 @@ async function ollamaStream(pathname, bodyObj, onChunk, signal) {
           const o = JSON.parse(line);
           if (o.message) {
             if (o.message.content) msg.content += o.message.content;
-            if (o.message.tool_calls) msg.tool_calls = o.message.tool_calls;
+            if (o.message.tool_calls) msg.tool_calls = mergeToolCalls(msg.tool_calls, o.message.tool_calls);
           }
           if (o.eval_count) data.eval_count = o.eval_count;
           if (o.prompt_eval_count) data.prompt_eval_count = o.prompt_eval_count;
@@ -153,7 +181,7 @@ async function ollamaStream(pathname, bodyObj, onChunk, signal) {
             if (onChunk) onChunk({ type: 'thinking', content: obj.message.thinking });
           }
           if (obj.message.tool_calls) {
-            toolCalls = obj.message.tool_calls;
+            toolCalls = mergeToolCalls(toolCalls, obj.message.tool_calls);
             if (onChunk) onChunk({ type: 'tool_calls', tool_calls: obj.message.tool_calls });
           }
         }
@@ -259,7 +287,7 @@ async function backendChat(bodyObj, onChunk, signal) {
           if (onChunk) onChunk({ type: 'thinking', content: delta.reasoning_content });
         }
         if (delta.tool_calls) {
-          toolCalls = delta.tool_calls;
+          toolCalls = mergeToolCalls(toolCalls, delta.tool_calls);
           if (onChunk) onChunk({ type: 'tool_calls', tool_calls: delta.tool_calls });
         }
         if (obj.usage) {

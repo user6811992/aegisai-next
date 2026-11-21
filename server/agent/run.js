@@ -31,6 +31,7 @@ async function runAgent(opts) {
     allowedTools,
     deniedTools,
     onEvent = () => {},
+    signal,
     externalTools = { ghidra: [], craft: [], are: [], rea: [] },
   } = opts;
 
@@ -67,8 +68,9 @@ async function runAgent(opts) {
 
   // budget trim: coding first, then externals
   if (tools.length > toolBudget) {
-    const codingTools = tools.filter((t) => !t.function.name.startsWith('ghidra_') && !t.function.name.startsWith('craft_') && !t.function.name.startsWith('are_'));
-    const externals = tools.filter((t) => t.function.name.startsWith('ghidra_') || t.function.name.startsWith('craft_') || t.function.name.startsWith('are_'));
+    const external = (n) => n.startsWith('ghidra_') || n.startsWith('craft_') || n.startsWith('are_') || n.startsWith('rea_');
+    const codingTools = tools.filter((t) => !external(t.function.name));
+    const externals = tools.filter((t) => external(t.function.name));
     const kept = [...codingTools];
     let rem = toolBudget - kept.length;
     for (const t of externals) { if (rem <= 0) break; kept.push(t); rem -= 1; }
@@ -82,13 +84,13 @@ async function runAgent(opts) {
     onEvent({ type: 'status', message: 'calling model' });
     let resp;
     try {
-      resp = await backends.backendChat({ model, messages: msgs, tools, stream: true }, (e) => onEvent(e));
+      resp = await backends.backendChat({ model, messages: msgs, tools, stream: true }, (e) => onEvent(e), signal);
     } catch (e) {
       // Retry without tools (vision models like moondream don't support tool calls)
       if (tools && tools.length > 0) {
         try {
           tools = [];
-          resp = await backends.backendChat({ model, messages: msgs, tools: [], stream: true }, (e) => onEvent(e));
+          resp = await backends.backendChat({ model, messages: msgs, tools: [], stream: true }, (e) => onEvent(e), signal);
         } catch (e2) {
           return { final: { type: 'done', final: 'error: ' + (e2.message || e2), toolLog }, toolLog };
         }

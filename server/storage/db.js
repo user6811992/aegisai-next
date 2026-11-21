@@ -65,6 +65,7 @@ function open(dbPath) {
 }
 
 function get() { if (!db) throw new Error('Database not opened'); return db; }
+function isOpen() { return !!db; }
 
 function run(sql, params) {
   const stmt = get().prepare(sql);
@@ -183,7 +184,7 @@ function migrateFromJson(dataDir) {
 
 function close() { if (db) { db.close(); db = null; } }
 
-module.exports = { open, get, close, migrateFromJson, backend,
+module.exports = { open, get, isOpen, close, migrateFromJson, backend,
   listChats, getChat, saveChat, deleteChat, listBranches, chatCount,
   listMemories, getMemory, saveMemory, deleteMemory, memoryCount,
   listSkills, getSkill, saveSkill, deleteSkill };

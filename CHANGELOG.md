@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.1] - 2026-11-21
+
+### Fixed
+- `package-lock.json` version desynced from `package.json`.
+- SSE error path: agent exceptions now emit an `error` event instead of hanging the UI; client disconnect aborts the run; 30-minute deadline added.
+- Streamed tool calls are merged by index instead of overwritten (fixes fragmented arguments on OpenAI-compatible backends).
+- REA tools now respect the tool budget.
+- `/api/agent` validates `messages` is an array; `/api/backend` validates the URL scheme and rejects embedded credentials.
+- Server fails fast if the database cannot be opened.
+
+### Changed
+- README: corrected installer version, `server.js` line count, and Docker token instructions.
+
 ## [1.1.0] - 2026-11-21
 
 ### Fixed

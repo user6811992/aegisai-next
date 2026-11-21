@@ -118,6 +118,13 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/backend' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (body.url) {
+        let parsed;
+        try { parsed = new URL(body.url); } catch (e) { return json(res, 400, { ok: false, error: 'invalid backend url' }); }
+        if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || parsed.username || parsed.password) {
+          return json(res, 400, { ok: false, error: 'invalid backend url' });
+        }
+      }
       const b = require('./server/backends');
       b.setBackend(body.type, body.url);
       // persist
@@ -177,6 +184,9 @@ const server = http.createServer(async (req, res) => {
       let body;
       try { body = JSON.parse(await readBody(req) || '{}'); }
       catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (body.messages !== undefined && !Array.isArray(body.messages)) {
+        return json(res, 400, { ok: false, error: 'messages must be an array' });
+      }
       // Gather external tools from available integrations.
       const avail = await integrations.registry.available();
       const ext = { ghidra: [], craft: [], are: [], rea: [] };
@@ -196,20 +206,31 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
       const send = (obj) => { try { res.write('data: ' + JSON.stringify(obj) + '\n\n'); } catch (e) {} };
-      const result = await agent.runAgent({
-        model: body.model,
-        messages: body.messages || [],
-        projectRoot: projectRoot,
-        includeCoding: body.includeCoding !== false,
-        includeRe: !!body.includeRe,
-        cleanRoom: !!body.cleanRoom,
-        toolBudget: body.toolBudget || s.toolBudget || config.TOOL_BUDGET,
-        allowedTools: body.allowedTools,
-        deniedTools: body.deniedTools,
-        externalTools: body.externalTools || ext,
-        onEvent: (e) => send(e),
-      });
-      send({ type: 'done', ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog });
+      const controller = new AbortController();
+      res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+      const signal = (typeof AbortSignal.any === 'function')
+        ? AbortSignal.any([controller.signal, AbortSignal.timeout(30 * 60 * 1000)])
+        : controller.signal;
+      try {
+        const result = await agent.runAgent({
+          model: body.model,
+          messages: body.messages || [],
+          projectRoot: projectRoot,
+          includeCoding: body.includeCoding !== false,
+          includeRe: !!body.includeRe,
+          cleanRoom: !!body.cleanRoom,
+          toolBudget: body.toolBudget || s.toolBudget || config.TOOL_BUDGET,
+          allowedTools: body.allowedTools,
+          deniedTools: body.deniedTools,
+          externalTools: body.externalTools || ext,
+          onEvent: (e) => send(e),
+          signal,
+        });
+        send({ type: 'done', ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog });
+      } catch (e) {
+        send({ type: 'error', ok: false, error: String(e && e.message ? e.message : e) });
+        send({ type: 'done', ok: false, final: '', thinking: '', toolLog: [] });
+      }
       res.end();
       return;
     }
@@ -859,6 +880,10 @@ const server = http.createServer(async (req, res) => {
 });
 
 async function start() {
+  if (!db.isOpen()) {
+    console.error('Refusing to start: database could not be opened. Check AEGISAI_DATA_DIR and file permissions.');
+    process.exit(1);
+  }
   try { await backends.detectBackend(); } catch (e) {}
   const isLoopback = HOST === '127.0.0.1' || HOST === 'localhost' || HOST === '::1';
   if (!isLoopback && !TOKEN) {

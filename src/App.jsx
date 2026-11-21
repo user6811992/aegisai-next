@@ -108,6 +108,8 @@ export default function App() {
             assistant.content += '\n🔧 ' + ev.name + '\n';
           } else if (ev.type === 'done' && ev.final !== undefined) {
             finalData = ev;
+          } else if (ev.type === 'error') {
+            finalData = { error: ev.error, final: '', toolLog: [] };
           }
           setMessages([...next, { ...assistant }]);
         }

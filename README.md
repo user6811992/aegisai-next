@@ -118,7 +118,7 @@ public/          build output (served by Node)
 tests/           20 tests (security, http, agent, wave4)
 ```
 
-`server.js` is wiring only (~500 lines). Each module is independently testable.
+`server.js` is wiring only (~890 lines). Each module is independently testable.
 
 ## Docker
 
@@ -126,7 +126,11 @@ tests/           20 tests (security, http, agent, wave4)
 docker compose up -d
 ```
 
-Starts Ollama (port 11434) + AegisAI (port 8080). Data persists in named volumes.
+Starts Ollama (port 11434) + AegisAI (port 8080). Data persists in named volumes. Set `AEGISAI_TOKEN` before starting — the container binds `0.0.0.0` and the server refuses to start without a token:
+
+```bash
+AEGISAI_TOKEN=your-strong-secret docker compose up -d
+```
 
 ## Installer (Windows)
 
@@ -136,7 +140,7 @@ Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 .\installer\build.ps1
 ```
 
-Output: `installer/output/AegisAI-Next-Setup-1.0.0.exe`
+Output: `installer/output/AegisAI-Next-Setup-1.1.1.exe`
 
 ## Installer (macOS)
 
