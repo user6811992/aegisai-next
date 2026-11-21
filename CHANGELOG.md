@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.10] - 2026-11-21
+
+### Fixed
+- Added `process.on('uncaughtException'/'unhandledRejection')` handlers that log to `error.log` (improves crash diagnostics).
+
 ## [1.1.9] - 2026-11-21
 
 ### Fixed

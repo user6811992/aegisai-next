@@ -869,7 +869,18 @@ async function start() {
   });
 }
 
-if (require.main === module) start();
+if (require.main === module) {
+  process.on('uncaughtException', (e) => {
+    try { require('fs').appendFileSync(require('./server/core/config').DATA_DIR + '/error.log', new Date().toISOString() + ' uncaughtException: ' + (e && e.stack ? e.stack : e) + '\n'); } catch (_) {}
+    console.error('uncaughtException:', e);
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (e) => {
+    try { require('fs').appendFileSync(require('./server/core/config').DATA_DIR + '/error.log', new Date().toISOString() + ' unhandledRejection: ' + (e && e.stack ? e.stack : e) + '\n'); } catch (_) {}
+    console.error('unhandledRejection:', e);
+  });
+  start();
+}
 
 module.exports = {
   server,
