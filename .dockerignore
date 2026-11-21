@@ -1,0 +1,11 @@
+node_modules
+.git
+data
+scripts
+build
+dist
+public/assets
+installer/output
+*.log
+.env
+.env.*

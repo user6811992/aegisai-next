@@ -199,6 +199,8 @@ const server = http.createServer(async (req, res) => {
       }
       // REA tools namespaced as rea_ in agent; map them into ext.rea (already).
       const s = settings.load();
+      const reqBudget = parseInt(body.toolBudget, 10);
+      const toolBudget = (Number.isFinite(reqBudget) && reqBudget > 0) ? reqBudget : (s.toolBudget || config.TOOL_BUDGET);
       // Server-Sent Events stream
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -219,7 +221,7 @@ const server = http.createServer(async (req, res) => {
           includeCoding: body.includeCoding !== false,
           includeRe: !!body.includeRe,
           cleanRoom: !!body.cleanRoom,
-          toolBudget: body.toolBudget || s.toolBudget || config.TOOL_BUDGET,
+          toolBudget: toolBudget,
           allowedTools: body.allowedTools,
           deniedTools: body.deniedTools,
           externalTools: body.externalTools || ext,
@@ -565,7 +567,8 @@ const server = http.createServer(async (req, res) => {
         for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
         const score = (na && nb) ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
         return { m, score };
-      }).sort((x, y) => y.score - x.score).slice(0, body.limit || 10);
+      const limit = Math.max(0, Math.min(parseInt(body.limit, 10) || 10, 100));
+      }).sort((x, y) => y.score - x.score).slice(0, limit);
       return json(res, 200, { ok: true, results: scored.map((s) => ({ ...s.m, score: s.score })) });
     }
     if (url === '/api/squeeze' && req.method === 'POST') {
@@ -679,17 +682,11 @@ const server = http.createServer(async (req, res) => {
       const https = require('https');
       const fs = require('fs');
       const path = require('path');
-      const { runProcess } = require('./server/core/security');
+      const { runProcess, downloadToFile } = require('./server/core/security');
       const rustupPath = path.join(DATA_DIR, 'rustup-init.exe');
       try {
         if (!fs.existsSync(rustupPath)) {
-          await new Promise((resolve, reject) => {
-            const file = fs.createWriteStream(rustupPath);
-            https.get('https://win.rustup.rs/x86_64', (res) => {
-              res.pipe(file);
-              file.on('finish', () => { file.close(); resolve(); });
-            }).on('error', (e) => { fs.unlink(rustupPath, () => {}); reject(e); });
-          });
+          await downloadToFile('https://win.rustup.rs/x86_64', rustupPath);
         }
         const r = await runProcess(rustupPath, ['-y', '--default-toolchain', 'stable'], { timeout: 600000, shell: true });
         return json(res, 200, { ok: r.ok, output: (r.out || '').slice(-500), error: r.err });
@@ -699,7 +696,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (url === '/api/integrations/craft/install' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
-      const { runProcess } = require('./server/core/security');
+      const { runProcess, downloadToFile } = require('./server/core/security');
       const fs = require('fs');
       const path = require('path');
       const dir = path.join(DATA_DIR, 'tools', 'craft-anything');
@@ -719,15 +716,8 @@ const server = http.createServer(async (req, res) => {
       for (const url of candidates) {
         try {
           const dest = path.join(binDir, 'craft-anything-cli.exe');
-          const ok = await new Promise((resolve) => {
-            const file = fs.createWriteStream(dest);
-            https.get(url, { headers: { 'User-Agent': 'AegisAI' } }, (res) => {
-              if (res.statusCode !== 200) { file.close(); fs.unlink(dest, () => {}); resolve(false); return; }
-              res.pipe(file);
-              file.on('finish', () => { file.close(); resolve(true); });
-            }).on('error', () => { file.close(); fs.unlink(dest, () => {}); resolve(false); });
-          });
-          if (ok && fs.existsSync(dest)) {
+          await downloadToFile(url, dest);
+          if (fs.existsSync(dest)) {
             const cfg = intConfig.load();
             cfg.CRAFT_BIN = dest;
             intConfig.save(cfg);
@@ -810,14 +800,8 @@ const server = http.createServer(async (req, res) => {
       const zipPath = path.join(DATA_DIR, assetName);
       const extractDir = path.join(DATA_DIR, 'tools', 'ghidra-mcp');
       fs.mkdirSync(path.dirname(zipPath), { recursive: true });
-      // Download
-      await new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(zipPath);
-        https.get(assetUrl, { headers: { 'User-Agent': 'AegisAI' } }, (res) => {
-          res.pipe(file);
-          file.on('finish', () => { file.close(); resolve(); });
-        }).on('error', (e) => { fs.unlink(zipPath, () => {}); reject(e); });
-      });
+      // Download (follows redirects; rejects non-200)
+      await sec.downloadToFile(assetUrl, zipPath);
       // Extract using PowerShell Expand-Archive
       const { runProcess } = require('./server/core/security');
       const psBin = process.platform === 'win32' ? 'powershell.exe' : 'powershell';

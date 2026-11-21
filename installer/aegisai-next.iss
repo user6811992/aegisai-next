@@ -3,7 +3,7 @@
 ; Requires: Inno Setup 6 (https://jrsoftware.org/isinfo.php)
 
 #define MyAppName "AegisAI (next)"
-#define MyAppVersion "1.1.1"
+#define MyAppVersion "1.1.2"
 #define MyAppPublisher "AegisAI"
 #define MyAppURL "https://github.com/user6811992/aegisai-next"
 #define MyAppExeName "launcher.vbs"
@@ -57,16 +57,18 @@ Source: "..\src\*"; DestDir: "{app}\src"; Flags: ignoreversion recursesubdirs
 Source: "..\static\*"; DestDir: "{app}\static"; Flags: ignoreversion recursesubdirs
 Source: "..\vite.config.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\index.html"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\launcher.vbs"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\installer\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\data"; Flags: uninsneveruninstall
 Name: "{app}\workspace"; Flags: uninsneveruninstall
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; WorkingDir: "{app}"; IconFilename: "{app}\public\icon.svg"
+Name: "{group}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; WorkingDir: "{app}"; IconFilename: "{app}\public\icon.svg"; Tasks: desktopicon
-Name: "{userstartup}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; WorkingDir: "{app}"; IconFilename: "{app}\public\icon.svg"; Tasks: startupicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"; Tasks: desktopicon
+Name: "{userstartup}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"; Tasks: startupicon
 
 [Run]
 Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm install"; StatusMsg: "Installing npm dependencies..."; Flags: runhidden waituntilterminated

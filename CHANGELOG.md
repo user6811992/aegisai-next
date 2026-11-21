@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.2] - 2026-11-21
+
+### Fixed
+- Install endpoints now follow HTTP redirects and reject non-200 responses (craft rustup, craft prebuilt binary, Ghidra MCP zip).
+- macOS/Linux installer scripts: corrected version to 1.1.2 and build with dev deps so `vite` is available.
+- Added `.dockerignore` (excludes node_modules, .git, data, build artifacts).
+- Windows installer: uses a real `.ico` icon and installs `launcher.vbs`.
+- `launcher.vbs` honors `PORT` instead of hardcoding 8080.
+- Agent `toolBudget` is clamped to a positive integer.
+- `/api/rag/search` `limit` is clamped to 0-100.
+- README security wording updated; removed obsolete `version` key from docker-compose.
+
 ## [1.1.1] - 2026-11-21
 
 ### Fixed

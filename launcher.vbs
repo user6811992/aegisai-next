@@ -6,6 +6,10 @@ Dim wshShell, fso, base
 Set wshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
+Dim appPort
+appPort = wshShell.ExpandEnvironmentStrings("%PORT%")
+If appPort = "%PORT%" Or appPort = "" Then appPort = "8080"
+
 base = fso.GetParentFolderName(WScript.ScriptFullName)
 If base = "" Then base = wshShell.ExpandEnvironmentStrings("%USERPROFILE%") & "\Documents\aegisai-next"
 
@@ -46,7 +50,7 @@ Dim http, portOpen
 portOpen = False
 On Error Resume Next
 Set http = CreateObject("MSXML2.XMLHTTP")
-http.Open "GET", "http://127.0.0.1:8080/", False
+http.Open "GET", "http://127.0.0.1:" & appPort & "/", False
 http.Send
 If Err.Number = 0 And http.Status = 200 Then portOpen = True
 Err.Clear
@@ -62,7 +66,7 @@ If Not portOpen Then
     WScript.Sleep 1000
     On Error Resume Next
     Set http = CreateObject("MSXML2.XMLHTTP")
-    http.Open "GET", "http://127.0.0.1:8080/", False
+    http.Open "GET", "http://127.0.0.1:" & appPort & "/", False
     http.Send
     If Err.Number = 0 And http.Status = 200 Then serverReady = True
     Err.Clear
@@ -74,7 +78,7 @@ End If
 
 ' Launch browser
 Dim appUrl
-appUrl = "http://127.0.0.1:8080"
+appUrl = "http://127.0.0.1:" & appPort
 wshShell.Run appUrl, 1, False
 
 On Error GoTo 0

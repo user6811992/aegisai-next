@@ -4,7 +4,7 @@
 
 set -e
 APP_NAME="AegisAI (next)"
-VERSION="1.0.0"
+VERSION="1.1.2"
 BUILD_DIR="build/appimage"
 APPDIR="$BUILD_DIR/AegisAI.AppDir"
 
@@ -18,7 +18,7 @@ mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/i
 cp -r . "$APPDIR/usr/bin/aegisai" 2>/dev/null || true
 cd "$APPDIR/usr/bin/aegisai"
 rm -rf node_modules .git data scripts
-npm install --omit=dev
+npm install
 npm run build
 cd ../../../..
 

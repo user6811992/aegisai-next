@@ -87,4 +87,40 @@ function safePath(projectRoot, rel) {
   return resolved;
 }
 
-module.exports = { runProcess, isValidModelName, isSafeUrl, validateProjectRoot, safePath };
+// Download a URL to disk, following up to 5 redirects (http/https only).
+// Rejects non-200 responses instead of writing an error page to disk.
+function downloadToFile(url, dest, opts) {
+  const http = require('http');
+  const https = require('https');
+  const fs = require('fs');
+  const maxHops = (opts && opts.maxRedirects) || 5;
+  return new Promise((resolve, reject) => {
+    let hops = 0;
+    const doGet = (u) => {
+      let parsed;
+      try { parsed = new URL(u); } catch (e) { return reject(e); }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return reject(new Error('unsupported protocol: ' + parsed.protocol));
+      const lib = parsed.protocol === 'https:' ? https : http;
+      const headers = Object.assign({ 'User-Agent': 'AegisAI' }, (opts && opts.headers) || {});
+      const req = lib.get(u, { headers }, (res) => {
+        const code = res.statusCode;
+        if ([301, 302, 303, 307, 308].includes(code) && res.headers.location && hops < maxHops) {
+          hops += 1;
+          res.resume();
+          let next;
+          try { next = new URL(res.headers.location, u).toString(); } catch (e) { return reject(e); }
+          return doGet(next);
+        }
+        if (code !== 200) { res.resume(); return reject(new Error('HTTP ' + code)); }
+        const file = fs.createWriteStream(dest);
+        res.pipe(file);
+        file.on('finish', () => { file.close(() => resolve()); });
+        file.on('error', (e) => { fs.unlink(dest, () => {}); reject(e); });
+      });
+      req.on('error', (e) => { try { fs.unlink(dest, () => {}); } catch (_) {} reject(e); });
+    };
+    doGet(url);
+  });
+}
+
+module.exports = { runProcess, isValidModelName, isSafeUrl, validateProjectRoot, safePath, downloadToFile };

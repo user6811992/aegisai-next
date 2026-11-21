@@ -53,7 +53,7 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 - **Dark theme** — default dark UI
 - **Docker** — Dockerfile + docker-compose.yml
 - **No telemetry** — zero phone-home
-- **Security** — token auth, path traversal protection, SSRF guard, shell-safe process spawning
+- **Security** — token auth, path traversal protection, URL validation on user-supplied fetches, shell-safe process spawning
 
 ## Quick Start
 
@@ -140,7 +140,7 @@ Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 .\installer\build.ps1
 ```
 
-Output: `installer/output/AegisAI-Next-Setup-1.1.1.exe`
+Output: `installer/output/AegisAI-Next-Setup-1.1.2.exe`
 
 ## Installer (macOS)
 

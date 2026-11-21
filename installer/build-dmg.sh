@@ -4,7 +4,7 @@
 
 set -e
 APP_NAME="AegisAI (next)"
-VERSION="1.0.0"
+VERSION="1.1.2"
 BUILD_DIR="build/macos"
 DMG_NAME="AegisAI-Next-${VERSION}.dmg"
 
@@ -18,7 +18,7 @@ mkdir -p "$BUILD_DIR"
 cp -r . "$BUILD_DIR/AegisAI (next)" 2>/dev/null || true
 cd "$BUILD_DIR/AegisAI (next)"
 rm -rf node_modules .git data scripts
-npm install --omit=dev
+npm install
 npm run build
 cd ../..
 
