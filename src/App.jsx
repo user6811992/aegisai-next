@@ -39,6 +39,8 @@ if (_origFetch) {
       if (!h['X-Auth-Token'] && !h['x-auth-token']) h['X-Auth-Token'] = tok;
       init.headers = h;
     }
+    init = init || {};
+    init.credentials = 'include';
     return _origFetch(input, init);
   };
 }
@@ -92,6 +94,8 @@ export default function App() {
   const [documents, setDocuments] = useState([]);
   const [includeDocuments, setIncludeDocuments] = useState(false);
   const [pendingImage, setPendingImage] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [ragQuery, setRagQuery] = useState('');
   const [ragResults, setRagResults] = useState([]);
   const [toolLog, setToolLog] = useState([]);
@@ -100,6 +104,8 @@ export default function App() {
   const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
   const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
   const refreshDocuments = () => fetch('/api/documents').then((r) => r.json()).then((d) => setDocuments(d.documents || [])).catch(() => {});
+  const refreshUsers = () => fetch('/api/users').then((r) => r.json()).then((d) => setUsers(d.users || [])).catch(() => {});
+  const refreshTasks = () => fetch('/api/tasks').then((r) => r.json()).then((d) => setTasks(d.tasks || [])).catch(() => {});
   const loadChats = () => { setLoadingChats(true); fetch('/api/chats').then((r) => r.json()).then((d) => setChats(d.chats || [])).catch(() => {}).finally(() => setLoadingChats(false)); };
   const newChat = () => { setMessages([]); setChatId(null); setBranches([]); setToolLog([]); };
 
@@ -117,6 +123,8 @@ export default function App() {
     refreshMemory();
     refreshSkills();
     refreshDocuments();
+    refreshUsers();
+    refreshTasks();
     loadChats();
     return () => { cancelled = true; };
   }, []);
@@ -379,7 +387,7 @@ export default function App() {
         <span class="text-xs text-gray-400">v{version}</span>
         <nav class="ml-4 flex gap-2">
           <button class="text-sm px-2 py-1 rounded text-gray-300 hover:bg-gray-700" onClick={() => { setShowSidebar((s) => !s); loadChats(); }}>Chats</button>
-          {['chat', 'memory', 'skills', 'are', 'models', 'documents'].map((t) => (
+          {['chat', 'memory', 'skills', 'are', 'models', 'documents', 'users', 'tasks'].map((t) => (
             <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={() => setTab(t)}>{t}</button>
           ))}
         </nav>
@@ -593,6 +601,69 @@ export default function App() {
             </div>
           ))}
           {documents.length === 0 && <div class="text-xs text-gray-500">No documents uploaded.</div>}
+        </main>
+      )}
+
+      {tab === 'users' && (
+        <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
+          <div class={`space-y-2 border border-gray-700 rounded p-3 ${card}`}>
+            <div class="text-sm text-gray-200 font-medium">Create user</div>
+            <input id="newUserName" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" placeholder="Username" />
+            <select id="newUserRole" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={async () => {
+              const name = document.getElementById('newUserName').value.trim();
+              const role = document.getElementById('newUserRole').value;
+              if (!name) { alert('Username required'); return; }
+              const r = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: name, role }) });
+              const d = await r.json();
+              if (d.ok) { alert('Created: ' + name + '\nToken: ' + d.token); refreshUsers(); document.getElementById('newUserName').value = ''; }
+              else { alert('Failed: ' + (d.error || 'unknown')); }
+            }}>Create user</button>
+          </div>
+          {users.map((u) => (
+            <div key={u.id} class={`${card} p-3 flex justify-between items-start`}>
+              <div>
+                <div class="font-medium text-sm text-gray-100">{u.username}</div>
+                <div class="text-xs text-gray-400">{u.role} · {u.created}</div>
+              </div>
+              <button class="text-red-400 text-xs" onClick={async () => { await fetch('/api/users/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: u.id }) }); refreshUsers(); }}>del</button>
+            </div>
+          ))}
+          {users.length === 0 && <div class="text-xs text-gray-500">No users (using global token auth).</div>}
+        </main>
+      )}
+
+      {tab === 'tasks' && (
+        <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
+          <div class={`space-y-2 border border-gray-700 rounded p-3 ${card}`}>
+            <div class="text-sm text-gray-200 font-medium">Create scheduled task</div>
+            <input id="newTaskName" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" placeholder="Task name" />
+            <input id="newTaskSkill" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" placeholder="Skill name (optional)" />
+            <input id="newTaskInterval" type="number" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" placeholder="Interval (minutes)" defaultValue={60} />
+            <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={async () => {
+              const name = document.getElementById('newTaskName').value.trim();
+              const skill = document.getElementById('newTaskSkill').value.trim();
+              const interval = parseInt(document.getElementById('newTaskInterval').value, 10) || 60;
+              if (!name) { alert('Task name required'); return; }
+              const r = await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, skill_name: skill || null, interval_minutes: interval, enabled: true }) });
+              const d = await r.json();
+              if (d.ok) { alert('Created: ' + name); refreshTasks(); document.getElementById('newTaskName').value = ''; }
+              else { alert('Failed: ' + (d.error || 'unknown')); }
+            }}>Create task</button>
+          </div>
+          {tasks.map((t) => (
+            <div key={t.id} class={`${card} p-3 flex justify-between items-start`}>
+              <div>
+                <div class="font-medium text-sm text-gray-100">{t.name}</div>
+                <div class="text-xs text-gray-400">{t.skill_name || 'no skill'} · every {t.interval_minutes}min · {t.enabled ? 'enabled' : 'disabled'} · last: {t.last_run || 'never'}</div>
+              </div>
+              <button class="text-red-400 text-xs" onClick={async () => { await fetch('/api/tasks/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) }); refreshTasks(); }}>del</button>
+            </div>
+          ))}
+          {tasks.length === 0 && <div class="text-xs text-gray-500">No scheduled tasks.</div>}
         </main>
       )}
 

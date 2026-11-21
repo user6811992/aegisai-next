@@ -7,3 +7,22 @@ body {
   color: #f3f4f6;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  .modal-box { width: 95vw !important; max-width: 95vw !important; }
+  .chat-input-row { flex-wrap: wrap; }
+  .chat-input-row input { min-width: 0; }
+  .chat-input-row button { padding: 0.5rem 0.75rem; font-size: 0.8rem; }
+  .sidebar-panel { width: 85vw !important; }
+  .message-bubble { max-width: 95% !important; margin-left: 0 !important; }
+  .header-bar { flex-wrap: wrap; gap: 0.5rem; }
+  .header-bar h1 { font-size: 1rem; }
+  .tab-bar button { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+}
+
+/* Touch-friendly targets */
+@media (pointer: coarse) {
+  button, input, select, textarea { min-height: 44px; }
+  .text-xs button { min-height: 36px; }
+}

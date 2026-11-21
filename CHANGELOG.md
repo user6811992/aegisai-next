@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.31] - 2026-11-21
+
+### Fixed
+- http.test.js now uses temp data dir (avoids leftover state from manual testing).
+- All 33 tests pass.
+
+## [1.1.30] - 2026-11-21
+
+### Added
+- Multi-user support: users table, /api/users CRUD, token-per-user auth.
+- Scheduled tasks: tasks table, /api/tasks CRUD, background runner.
+- Audit log: (already in v1.1.28) action logging.
+
 ## [1.1.29] - 2026-11-21
 
 ### Fixed

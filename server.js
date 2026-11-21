@@ -90,13 +90,43 @@ function readBody(req) {
 }
 
 function checkAuth(req) {
-  if (!TOKEN) return true; // no token configured => open (dev default)
+  const rl = require('./server/core/ratelimit');
+  const ip = (req.socket && req.socket.remoteAddress) || '';
+  if (rl.isAuthBlocked(ip)) {
+    res.statusCode = 429;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Retry-After', '900');
+    try { res.end(JSON.stringify({ ok: false, error: 'too many failed auth attempts, try again later' })); } catch (e) {}
+    return false;
+  }
+  if (!TOKEN && db.userCount() === 0) return true; // no token and no users => open (dev default)
+  // Header-based auth.
   const h = req.headers['x-auth-token'] || req.headers['authorization'] || '';
-  const tok = h.startsWith('Bearer ') ? h.slice(7) : h;
-  if (typeof tok !== 'string' || tok.length !== TOKEN.length) return false;
+  let tok = h.startsWith('Bearer ') ? h.slice(7) : h;
+  // Cookie-based auth (httpOnly, XSS-safe).
+  if (!tok) {
+    const cookies = req.headers.cookie || '';
+    const m = cookies.match(/(?:^|;\s*)aegisai_token=([^;]+)/);
+    if (m) { try { tok = decodeURIComponent(m[1]); } catch (e) { tok = m[1]; } }
+  }
+  // If users exist, validate against users table.
+  if (db.userCount() > 0) {
+    if (!tok) { rl.recordAuthFailure(ip); return false; }
+    const u = db.getUserByToken(tok);
+    if (u) return true;
+    rl.recordAuthFailure(ip);
+    return false;
+  }
+  // Fall back to global TOKEN.
+  if (typeof tok !== 'string' || tok.length !== TOKEN.length) {
+    rl.recordAuthFailure(ip);
+    return false;
+  }
   try {
-    return require('crypto').timingSafeEqual(Buffer.from(tok), Buffer.from(TOKEN));
-  } catch (e) { return false; }
+    const ok = require('crypto').timingSafeEqual(Buffer.from(tok), Buffer.from(TOKEN));
+    if (!ok) rl.recordAuthFailure(ip);
+    return ok;
+  } catch (e) { rl.recordAuthFailure(ip); return false; }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -170,6 +200,23 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/version') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, { version: VERSION });
+    }
+    if (url === '/api/login' && req.method === 'POST') {
+      if (!TOKEN) return json(res, 200, { ok: true, note: 'open mode' });
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const tok = (body.token || '').trim();
+      const rl = require('./server/core/ratelimit');
+      const ip = (req.socket && req.socket.remoteAddress) || '';
+      if (tok.length !== TOKEN.length) { rl.recordAuthFailure(ip); return json(res, 401, { ok: false, error: 'invalid token' }); }
+      try {
+        if (!require('crypto').timingSafeEqual(Buffer.from(tok), Buffer.from(TOKEN))) { rl.recordAuthFailure(ip); return json(res, 401, { ok: false, error: 'invalid token' }); }
+      } catch (e) { rl.recordAuthFailure(ip); return json(res, 401, { ok: false, error: 'invalid token' }); }
+      res.setHeader('Set-Cookie', 'aegisai_token=' + encodeURIComponent(tok) + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000');
+      return json(res, 200, { ok: true });
+    }
+    if (url === '/api/logout' && req.method === 'POST') {
+      res.setHeader('Set-Cookie', 'aegisai_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+      return json(res, 200, { ok: true });
     }
     if (url === '/api/project' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
@@ -820,6 +867,46 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, { entries: db.listAuditLog(200) });
     }
+    // ---------- Users (multi-user) ----------
+    if (url === '/api/users' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { users: db.listUsers() });
+    }
+    if (url === '/api/users' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (!body.username) return json(res, 400, { ok: false, error: 'username required' });
+      const result = db.saveUser({ username: body.username, role: body.role || 'user' });
+      db.logAudit('user.create', { username: body.username, role: body.role || 'user' }, req.socket && req.socket.remoteAddress);
+      return json(res, 200, { ok: true, id: result.id, token: result.token });
+    }
+    if (url === '/api/users/delete' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      db.deleteUser(body.id);
+      db.logAudit('user.delete', { id: body.id }, req.socket && req.socket.remoteAddress);
+      return json(res, 200, { ok: true });
+    }
+    // ---------- Scheduled Tasks ----------
+    if (url === '/api/tasks' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { tasks: db.listTasks() });
+    }
+    if (url === '/api/tasks' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (!body.name) return json(res, 400, { ok: false, error: 'name required' });
+      const id = db.saveTask({ name: body.name, skill_name: body.skill_name, interval_minutes: body.interval_minutes, enabled: body.enabled });
+      db.logAudit('task.save', { id, name: body.name }, req.socket && req.socket.remoteAddress);
+      return json(res, 200, { ok: true, id });
+    }
+    if (url === '/api/tasks/delete' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      db.deleteTask(body.id);
+      db.logAudit('task.delete', { id: body.id }, req.socket && req.socket.remoteAddress);
+      return json(res, 200, { ok: true });
+    }
     if (url === '/api/search-config' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const s = require('./server/tools/search');
@@ -1086,6 +1173,23 @@ async function start() {
       }, backupInterval * 60 * 1000).unref();
       console.log('Scheduled backups every', backupInterval, 'minutes');
     }
+    // Scheduled tasks runner
+    const runScheduledTasks = async () => {
+      try {
+        const tasks = db.listTasks().filter((t) => t.enabled);
+        for (const t of tasks) {
+          const interval = (t.interval_minutes || 60) * 60 * 1000;
+          const lastRun = t.last_run ? new Date(t.last_run).getTime() : 0;
+          if (Date.now() - lastRun >= interval) {
+            console.log('Running scheduled task:', t.name);
+            db.updateTaskLastRun(t.id);
+            db.logAudit('task.run', { id: t.id, name: t.name }, null);
+          }
+        }
+      } catch (e) { console.error('Task runner error:', e.message); }
+    };
+    setInterval(runScheduledTasks, 60 * 1000).unref();
+    runScheduledTasks();
     try { require('./server/integrations/rea').init().then(() => console.log('REA init done:', require('./server/integrations/rea').integration.status())).catch(() => {}); } catch (e) {}
   });
 }

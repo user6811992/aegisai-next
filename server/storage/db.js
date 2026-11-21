@@ -82,6 +82,22 @@ function open(dbPath) {
           FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_doc_chunks_doc ON doc_chunks(doc_id);
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          username TEXT NOT NULL UNIQUE,
+          token TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'user',
+          created TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS scheduled_tasks (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          skill_name TEXT,
+          interval_minutes INTEGER NOT NULL DEFAULT 60,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          last_run TEXT,
+          created TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS audit_log (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           timestamp TEXT NOT NULL,
@@ -209,6 +225,41 @@ function saveDocChunk(chunk) {
 function listAllDocChunks() { return all('SELECT id, doc_id, chunk_index, text, embedding FROM doc_chunks'); }
 function docCount() { return one('SELECT COUNT(*) AS n FROM documents').n; }
 
+// ---------- Users ----------
+function listUsers() { return all('SELECT id, username, role, created FROM users ORDER BY created DESC'); }
+function getUser(id) { return one('SELECT id, username, token, role, created FROM users WHERE id = ?', [id]); }
+function getUserByToken(token) { return one('SELECT id, username, token, role, created FROM users WHERE token = ?', [token]); }
+function saveUser(u) {
+  const id = u.id || ('user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+  const existing = one('SELECT id FROM users WHERE id = ?', [id]);
+  if (existing) {
+    run('UPDATE users SET username=?, role=? WHERE id=?', [u.username, u.role || 'user', id]);
+  } else {
+    const token = u.token || (require('crypto').randomBytes(24).toString('hex'));
+    run('INSERT INTO users (id, username, token, role, created) VALUES (?,?,?,?,?)', [id, u.username, token, u.role || 'user', u.created || new Date().toISOString()]);
+    return { id, token };
+  }
+  return { id, token: (getUser(id) || {}).token };
+}
+function deleteUser(id) { run('DELETE FROM users WHERE id = ?', [id]); }
+function userCount() { return one('SELECT COUNT(*) AS n FROM users').n; }
+
+// ---------- Scheduled Tasks ----------
+function listTasks() { return all('SELECT * FROM scheduled_tasks ORDER BY created DESC'); }
+function getTask(id) { return one('SELECT * FROM scheduled_tasks WHERE id = ?', [id]); }
+function saveTask(t) {
+  const id = t.id || ('task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+  const existing = one('SELECT id FROM scheduled_tasks WHERE id = ?', [id]);
+  if (existing) {
+    run('UPDATE scheduled_tasks SET name=?, skill_name=?, interval_minutes=?, enabled=? WHERE id=?', [t.name, t.skill_name || null, t.interval_minutes || 60, t.enabled ? 1 : 0, id]);
+  } else {
+    run('INSERT INTO scheduled_tasks (id, name, skill_name, interval_minutes, enabled, created) VALUES (?,?,?,?,?,?)', [id, t.name, t.skill_name || null, t.interval_minutes || 60, t.enabled !== false ? 1 : 0, t.created || new Date().toISOString()]);
+  }
+  return id;
+}
+function deleteTask(id) { run('DELETE FROM scheduled_tasks WHERE id = ?', [id]); }
+function updateTaskLastRun(id) { run('UPDATE scheduled_tasks SET last_run=? WHERE id=?', [new Date().toISOString(), id]); }
+
 // ---------- Audit Log ----------
 function logAudit(action, details, ip) {
   try { run('INSERT INTO audit_log (timestamp, action, details, ip) VALUES (?,?,?,?)', [new Date().toISOString(), action, typeof details === 'string' ? details : JSON.stringify(details || {}), ip || null]); } catch (e) {}
@@ -252,4 +303,6 @@ module.exports = { open, get, isOpen, close, migrateFromJson, backend,
   listMemories, getMemory, saveMemory, deleteMemory, memoryCount,
   listSkills, getSkill, saveSkill, deleteSkill,
   listDocuments, getDocument, saveDocument, deleteDocument, listDocChunks, saveDocChunk, listAllDocChunks, docCount,
-  logAudit, listAuditLog };
+  logAudit, listAuditLog,
+  listUsers, getUser, getUserByToken, saveUser, deleteUser, userCount,
+  listTasks, getTask, saveTask, deleteTask, updateTaskLastRun };

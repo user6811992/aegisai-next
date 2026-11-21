@@ -68,4 +68,37 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref();
 
-module.exports = { check, LIMIT, WINDOW_MS, STRICT, isLoopback };
+// Auth-failure tracking (brute-force protection).
+const AUTH_FAIL_LIMIT = Math.max(0, parseInt(process.env.AEGISAI_AUTH_FAIL_LIMIT || '5', 10));
+const AUTH_FAIL_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_FAIL_BLOCK_MS = 15 * 60 * 1000;
+const authFailures = new Map(); // ip -> { timestamps: [], blockedUntil: 0 }
+
+function recordAuthFailure(ip) {
+  if (AUTH_FAIL_LIMIT <= 0) return;
+  const v = String(ip || '').toLowerCase().replace(/^::ffff:/, '');
+  if (isLoopback(v)) return;
+  const now = Date.now();
+  let b = authFailures.get(v);
+  if (!b) { b = { timestamps: [], blockedUntil: 0 }; authFailures.set(v, b); }
+  if (now < b.blockedUntil) return;
+  b.timestamps = b.timestamps.filter((t) => now - t < AUTH_FAIL_WINDOW_MS);
+  b.timestamps.push(now);
+  if (b.timestamps.length >= AUTH_FAIL_LIMIT) {
+    b.blockedUntil = now + AUTH_FAIL_BLOCK_MS;
+    b.timestamps = [];
+  }
+}
+
+function isAuthBlocked(ip) {
+  if (AUTH_FAIL_LIMIT <= 0) return false;
+  const v = String(ip || '').toLowerCase().replace(/^::ffff:/, '');
+  if (isLoopback(v)) return false;
+  const b = authFailures.get(v);
+  if (!b) return false;
+  if (Date.now() < b.blockedUntil) return true;
+  if (b.blockedUntil > 0) { b.blockedUntil = 0; b.timestamps = []; }
+  return false;
+}
+
+module.exports = { check, LIMIT, WINDOW_MS, STRICT, isLoopback, recordAuthFailure, isAuthBlocked, AUTH_FAIL_LIMIT };
