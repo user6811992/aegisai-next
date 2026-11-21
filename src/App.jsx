@@ -54,6 +54,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [loadingChats, setLoadingChats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [abortCtrl, setAbortCtrl] = useState(null);
   const [settingsCfg, setSettingsCfg] = useState({});
   const [integrations, setIntegrations] = useState({});
@@ -68,6 +69,7 @@ export default function App() {
   const [chats, setChats] = useState([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [chatSearch, setChatSearch] = useState('');
+  const [chatFolderFilter, setChatFolderFilter] = useState('');
   const [branches, setBranches] = useState([]);
   const [parentId, setParentId] = useState(null);
   const [cleanRoom, setCleanRoom] = useState(false);
@@ -107,6 +109,7 @@ export default function App() {
       const ms = (d.models || []).map((m) => m.name);
       setModels(ms);
       if (ms.length && !model) setModel(ms[0]);
+      if (ms.length === 0) setShowOnboarding(true);
     })).catch(() => {});
     fetch('/api/integrations/status').then((r) => r.json()).then((d) => { fetch('/api/backend').then((r) => r.json()).then((b) => safe(() => setIntegrations({ ...d, _backend: b }))).catch(() => safe(() => setIntegrations(d))); }).catch(() => {});
     refreshMemory();
@@ -354,10 +357,14 @@ export default function App() {
           </div>
           <button class="w-full text-left text-sm bg-blue-600 text-white rounded px-3 py-2 mb-2" onClick={() => { newChat(); setShowSidebar(false); }}>+ New chat</button>
           <input class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-xs text-gray-100 placeholder-gray-400 mb-2" value={chatSearch} onInput={(e) => setChatSearch(e.target.value)} placeholder="Search chats…" />
+          <select class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-xs text-gray-100 mb-2" value={chatFolderFilter} onChange={(e) => setChatFolderFilter(e.target.value)}>
+            <option value="">All folders</option>
+            {[...new Set(chats.map((c) => c.folder).filter(Boolean))].map((f) => <option value={f}>{f}</option>)}
+          </select>
           {loadingChats && chats.length === 0 && [1,2,3].map((i) => (
             <div key={i} class="w-full h-8 bg-gray-700/50 rounded animate-pulse mb-1" />
           ))}
-          {chats.filter((c) => !chatSearch || (c.title || '').toLowerCase().includes(chatSearch.toLowerCase()) || (c.snippet || '').toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
+          {chats.filter((c) => (!chatFolderFilter || (c.folder || '') === chatFolderFilter) && (!chatSearch || (c.title || '').toLowerCase().includes(chatSearch.toLowerCase()) || (c.snippet || '').toLowerCase().includes(chatSearch.toLowerCase()))).map((c) => (
             <button key={c.id} class={`w-full text-left text-xs rounded px-3 py-2 truncate ${chatId === c.id ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={async () => { const r = await fetch('/api/chats/' + c.id); const d = await r.json(); setMessages(d.messages || []); setChatId(c.id); setShowSidebar(false); loadChats(); }}>
               {c.title || 'Untitled'}
             </button>
@@ -393,7 +400,7 @@ export default function App() {
           )}
           <div class="px-4 py-1 flex gap-2 text-xs items-center flex-wrap">
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={() => setShowToolLog((s) => !s)}>Tool log ({toolLog.length})</button>
-            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={() => { const t = prompt('Chat title:', 'Chat'); if (t) { fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId, title: t, messages }) }); } }}>Rename</button>
+            <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={async () => { const t = prompt('Chat title:', 'Chat'); if (t) { const f = prompt('Folder (optional):', ''); fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: chatId, title: t, messages, folder: f || null }) }); } }}>Rename</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={saveChat}>Save chat</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={branchChat}>Branch</button>
             <button class="border border-gray-600 rounded px-2 py-0.5 text-gray-200 hover:bg-gray-700" onClick={navigateParent}>Parent</button>
@@ -665,6 +672,35 @@ export default function App() {
             </div>
           )}
         </main>
+      )}
+
+      {showOnboarding && (
+        <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 w-96 text-center">
+            <h2 class="text-xl font-bold text-white mb-2">Welcome to AegisAI (next)</h2>
+            <p class="text-sm text-gray-300 mb-4">No models found. Let's get you set up.</p>
+            <div class="space-y-2">
+              <button class="w-full bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={async () => {
+                setPulling(true); setPullMsg('Pulling llama3.2:3b...');
+                try {
+                  const r = await fetch('/api/pull-model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'llama3.2:3b' }) });
+                  const d = await r.json();
+                  setPullMsg(d.message || (d.ok ? 'Done!' : 'Failed'));
+                  if (d.ok) {
+                    const mr = await fetch('/api/models'); const md = await mr.json();
+                    const ms = (md.models || []).map((m) => m.name);
+                    setModels(ms); if (ms.length) setModel(ms[0]);
+                    setShowOnboarding(false);
+                  }
+                } catch (e) { setPullMsg('Error: ' + e.message); }
+                finally { setPulling(false); }
+              }} disabled={pulling}>{pulling ? 'Pulling…' : 'Pull llama3.2:3b (recommended)'}</button>
+              <button class="w-full border border-gray-600 text-gray-200 rounded px-4 py-2 text-sm" onClick={() => setShowOnboarding(false)}>Skip — I'll configure later</button>
+            </div>
+            {pullMsg && <p class="text-xs text-gray-400 mt-3">{pullMsg}</p>}
+            <p class="text-xs text-gray-500 mt-3">Make sure Ollama is running: <code class="text-gray-300">ollama serve</code></p>
+          </div>
+        </div>
       )}
 
       {showSettings && (

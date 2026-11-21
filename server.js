@@ -1013,8 +1013,25 @@ async function start() {
     console.error('Refusing to start: binding to a non-loopback address (' + HOST + ') without an auth token. Set LOCALAI_TOKEN/AEGISAI_TOKEN.');
     process.exit(1);
   }
-  server.listen(PORT, HOST, () => {
-    console.log(`AegisAI (next) v${VERSION} listening on http://${HOST}:${PORT}`);
+  const certPath = process.env.HTTPS_CERT;
+  const keyPath = process.env.HTTPS_KEY;
+  let listenServer = server;
+  if (certPath && keyPath) {
+    const https = require('https');
+    const fs = require('fs');
+    try {
+      const opts = { cert: fs.readFileSync(certPath), key: fs.readFileSync(keyPath) };
+      listenServer = https.createServer(opts);
+      listenServer.on('request', (req, res) => server.emit('request', req, res));
+    } catch (e) {
+      console.error('HTTPS cert load failed:', e.message);
+      process.exit(1);
+    }
+    console.log('HTTPS enabled');
+  }
+  listenServer.listen(PORT, HOST, () => {
+    const proto = (certPath && keyPath) ? 'https' : 'http';
+    console.log(`AegisAI (next) v${VERSION} listening on ${proto}://${HOST}:${PORT}`);
     try { require('./server/integrations/rea').init().then(() => console.log('REA init done:', require('./server/integrations/rea').integration.status())).catch(() => {}); } catch (e) {}
   });
 }

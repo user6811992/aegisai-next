@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.26] - 2026-11-21
+
+### Added
+- Database migrations: schema_version tracking + incremental migrations (v1 base, v2 folder column).
+- Chat folders/tags: folder column, filter dropdown in sidebar, folder assignment on rename.
+- Onboarding wizard: first-run modal to pull a recommended model.
+- HTTPS/TLS: HTTPS_CERT + HTTPS_KEY env vars enable HTTPS.
+- E2E tests: 6 smoke tests (health, version, settings, memory, document upload, 404).
+
 ## [1.1.25] - 2026-11-21
 
 ### Fixed
