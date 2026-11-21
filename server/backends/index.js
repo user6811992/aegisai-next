@@ -236,7 +236,16 @@ async function backendChat(bodyObj, onChunk, signal) {
   }
   const oaiBody = {
     model: bodyObj.model,
-    messages: bodyObj.messages || [],
+    messages: (bodyObj.messages || []).map((m) => {
+      if (m.images && Array.isArray(m.images) && m.images.length > 0) {
+        const content = [{ type: 'text', text: m.content || '' }];
+        for (const img of m.images) {
+          content.push({ type: 'image_url', image_url: { url: 'data:image/png;base64,' + img } });
+        }
+        return { role: m.role, content };
+      }
+      return m;
+    }),
     stream: bodyObj.stream !== false,
     temperature: bodyObj.options && bodyObj.options.temperature,
   };

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.23] - 2026-11-21
+
+### Added
+- Image input (vision): attach image button, base64 encoding, image display in chat, OpenAI-compat vision format support.
+
 ## [1.1.22] - 2026-11-21
 
 ### Added

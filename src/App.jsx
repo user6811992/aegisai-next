@@ -60,6 +60,7 @@ export default function App() {
   const [areReadme, setAreReadme] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [includeDocuments, setIncludeDocuments] = useState(false);
+  const [pendingImage, setPendingImage] = useState(null);
   const [ragQuery, setRagQuery] = useState('');
   const [ragResults, setRagResults] = useState([]);
   const [toolLog, setToolLog] = useState([]);
@@ -99,9 +100,11 @@ export default function App() {
     setInputHistory((h) => [...h, text]);
     setHistoryIdx(-1);
     const userMsg = { role: 'user', content: text };
+    if (pendingImage) { userMsg.images = [pendingImage]; }
     const next = [...messages, userMsg];
     setMessages(next);
     setInput('');
+    setPendingImage(null);
     setBusy(true);
     const ctrl = new AbortController();
     setAbortCtrl(ctrl);
@@ -382,6 +385,7 @@ export default function App() {
                   </details>
                 )}
                 <div class="text-sm text-gray-100 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: (function() { try { const html = marked.parse(m.content || ''); return (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) ? DOMPurify.sanitize(html) : html; } catch (e) { return (m.content || '').replace(/</g, '&lt;'); } })() }} />
+                {m.images && m.images.length > 0 && <div class="mt-2 flex gap-2 flex-wrap">{m.images.map((img, i) => <img key={i} src={'data:image/png;base64,' + img} class="max-w-xs rounded border border-gray-600" alt="attached" />)}</div>}
 {m.citations && m.citations.length > 0 && (
                   <div class="mt-2 flex flex-wrap gap-1">
                     {m.citations.map((c, i) => {
@@ -421,7 +425,21 @@ export default function App() {
                 else if (e.key === 'ArrowUp') { e.preventDefault(); if (inputHistory.length === 0) return; const newIdx = historyIdx === -1 ? inputHistory.length - 1 : Math.max(0, historyIdx - 1); setHistoryIdx(newIdx); setInput(inputHistory[newIdx]); }
                 else if (e.key === 'ArrowDown') { e.preventDefault(); if (historyIdx === -1) return; const newIdx = historyIdx + 1; if (newIdx >= inputHistory.length) { setHistoryIdx(-1); setInput(''); } else { setHistoryIdx(newIdx); setInput(inputHistory[newIdx]); } }
               }} placeholder="Message… (↑↓ history, Esc stop)" disabled={busy} />
-              <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={send} disabled={busy}>Send</button>
+              {pendingImage && <img src={'data:image/png;base64,' + pendingImage} class="h-10 w-10 object-cover rounded border border-gray-600" alt="pending" />}
+              <label class="bg-gray-700 text-gray-200 rounded px-3 py-2 text-sm cursor-pointer hover:bg-gray-600" title="Attach image">
+                📎
+                <input type="file" accept="image/*" class="hidden" onChange={async (e) => {
+                  const f = e.target.files[0]; if (!f) return;
+                  const buf = await f.arrayBuffer();
+                  const bytes = new Uint8Array(buf);
+                  let binary = '';
+                  const chunkSize = 0x8000;
+                  for (let i = 0; i < bytes.length; i += chunkSize) binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+                  setPendingImage(btoa(binary));
+                  e.target.value = '';
+                }} />
+              </label>
+              <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={() => send()} disabled={busy}>Send</button>
               {busy && <button class="bg-red-600 text-white rounded px-4 py-2 text-sm" onClick={() => abortCtrl?.abort()}>Stop</button>}
             </div>
           </footer>
