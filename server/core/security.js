@@ -38,8 +38,12 @@ function runProcess(file, args, opts) {
   });
 }
 
-// Ollama model references: name[:tag] or namespace/name[:tag]. Rejects whitespace,
-// quotes, and option-like leading dashes.
+/**
+ * Ollama model references: name[:tag] or namespace/name[:tag]. Rejects whitespace,
+ * quotes, and option-like leading dashes.
+ * @param {string} name - Model name to validate
+ * @returns {boolean} true if valid
+ */
 function isValidModelName(name) {
   return typeof name === 'string' && /^[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,199}$/.test(name);
 }

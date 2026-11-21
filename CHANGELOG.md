@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.44] - 2026-11-21
+
+### Changed
+- Enhanced mobile-responsive CSS with more breakpoints and touch targets.
+- Added JSDoc annotations to security.js (isSafeUrl, validateProjectRoot, isValidModelName, downloadToFile).
+
 ## [1.1.43] - 2026-11-21
 
 ### Added
