@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.19] - 2026-11-21
+
+### Added
+- Raw settings JSON textarea in Settings modal (edit settings.json directly with validation).
+
 ## [1.1.18] - 2026-11-21
 
 ### Fixed

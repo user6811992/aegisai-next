@@ -636,6 +636,10 @@ export default function App() {
               </label>
             </div>
             <p class="text-xs text-gray-500 mt-3">RAG reindex available via /api/rag/reindex.</p>
+            <div class="mt-3 border-t border-gray-700 pt-3">
+              <div class="text-xs text-gray-400 mb-1">Raw settings (JSON):</div>
+              <textarea class="w-full h-32 bg-gray-900 border border-gray-700 rounded p-2 text-xs font-mono text-gray-200" defaultValue={JSON.stringify(settingsCfg, null, 2)} onBlur={async (e) => { try { const cfg = JSON.parse(e.target.value); await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }); setSettingsCfg(cfg); alert('Settings saved'); } catch (err) { alert('Invalid JSON: ' + err.message); } }} />
+            </div>
           </div>
         </div>
       )}
