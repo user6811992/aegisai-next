@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.20] - 2026-11-21
+
+### Fixed
+- Raw settings textarea now re-mounts when settings load, so it displays current values.
+
 ## [1.1.19] - 2026-11-21
 
 ### Added
