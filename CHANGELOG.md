@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.6] - 2026-11-21
+
+### Fixed
+- `db.rowToMemory`/`getChat` no longer 500 on corrupt JSON rows (graceful fallback).
+- `isCleanRoomBlocked` regex tightened to keyword-boundary matching (fewer false positives).
+
 ## [1.1.5] - 2026-11-21
 
 ### Fixed

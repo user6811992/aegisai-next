@@ -15,7 +15,7 @@ const CLEAN_ROOM_BLOCKED = new Set([
 function isCleanRoomBlocked(name) {
   // block dangerous/source-reading tool names in clean room
   if (CLEAN_ROOM_BLOCKED.has(name)) return true;
-  if (/read|file|exec|run|decompil|fetch|search/i.test(name) && !/memory/i.test(name)) return true;
+  if (/(^|_)(read|file|exec|run|decompil|fetch|search)/i.test(name) && !/memory/i.test(name)) return true;
   return false;
 }
 

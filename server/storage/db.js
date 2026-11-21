@@ -87,7 +87,9 @@ function listChats() {
 function getChat(id) {
   const row = one('SELECT * FROM chats WHERE id = ?', [id]);
   if (!row) return null;
-  return { id: row.id, title: row.title, updated: row.updated, parent_id: row.parent_id, branch_from: row.branch_from, messages: JSON.parse(row.messages || '[]') };
+  let messages = [];
+  try { messages = JSON.parse(row.messages || '[]'); } catch (e) { messages = []; }
+  return { id: row.id, title: row.title, updated: row.updated, parent_id: row.parent_id, branch_from: row.branch_from, messages };
 }
 function saveChat(chat) {
   const id = chat.id || ('chat_' + Date.now());
@@ -114,7 +116,11 @@ function chatCount() { return one('SELECT COUNT(*) AS n FROM chats').n; }
 
 // ---------- Memories ----------
 function rowToMemory(r) {
-  return { id: r.id, text: r.text, source: r.source, tags: JSON.parse(r.tags || '[]'), created: r.created, updated: r.updated, embedding: r.embedding ? JSON.parse(r.embedding) : null };
+  let tags = [];
+  try { tags = JSON.parse(r.tags || '[]'); } catch (e) { tags = []; }
+  let embedding = null;
+  try { embedding = r.embedding ? JSON.parse(r.embedding) : null; } catch (e) { embedding = null; }
+  return { id: r.id, text: r.text, source: r.source, tags, created: r.created, updated: r.updated, embedding };
 }
 function listMemories() { return all('SELECT * FROM memories ORDER BY created DESC').map(rowToMemory); }
 function getMemory(id) { const r = one('SELECT * FROM memories WHERE id = ?', [id]); return r ? rowToMemory(r) : null; }
