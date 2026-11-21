@@ -107,14 +107,6 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     const safe = (fn) => { if (!cancelled) fn(); };
-    // Migrate localStorage token to httpOnly cookie (one-time).
-    const storedTok = (typeof localStorage !== 'undefined') ? (localStorage.getItem('aegisai_token') || '') : '';
-    if (storedTok) {
-      fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: storedTok }) })
-        .then((r) => r.json())
-        .then((d) => { if (d.ok) localStorage.removeItem('aegisai_token'); })
-        .catch(() => {});
-    }
     fetch('/api/version').then((r) => r.json()).then((d) => safe(() => setVersion(d.version))).catch(() => safe(() => setVersion('?')));
     fetch('/api/models').then((r) => r.json()).then((d) => safe(() => {
       const ms = (d.models || []).map((m) => m.name);

@@ -9,6 +9,13 @@ const { execFile } = require('child_process');
 
 // Always spawn without a shell so user-supplied values can never be interpreted
 // by cmd.exe / sh. Single most important process-safety primitive.
+/**
+ * Run a process without a shell (execFile). Returns { ok, out, err, code }.
+ * @param {string} file - Executable path
+ * @param {string[]} [args=[]] - Arguments
+ * @param {object} [opts] - execFile options (encoding, timeout, cwd, shell, etc.)
+ * @returns {Promise<{ok: boolean, out: string, err: string|null, code: number}>}
+ */
 function runProcess(file, args, opts) {
   return new Promise((resolve) => {
     try {

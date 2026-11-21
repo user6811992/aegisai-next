@@ -1206,6 +1206,20 @@ async function start() {
   });
 }
 
+// Clustering support: set AEGISAI_CLUSTER=1 to fork workers (one per CPU).
+if (process.env.AEGISAI_CLUSTER === '1' && require('cluster').isPrimary) {
+  const cluster = require('cluster');
+  const os = require('os');
+  const numWorkers = parseInt(process.env.AEGISAI_WORKERS || String(os.cpus().length), 10);
+  console.log('Primary process ' + process.pid + ' forking ' + numWorkers + ' workers');
+  for (let i = 0; i < numWorkers; i++) cluster.fork();
+  cluster.on('exit', (worker, code, signal) => {
+    console.log('Worker ' + worker.process.pid + ' died, restarting...');
+    cluster.fork();
+  });
+  return;
+}
+
 if (require.main === module) {
   const shutdown = (sig) => {
     console.log(sig + ' received, shutting down gracefully...');

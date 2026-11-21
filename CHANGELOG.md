@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.36] - 2026-11-21
+
+### Added
+- Cookie-only auth: removed localStorage token fallback; uses httpOnly cookies exclusively.
+- Mobile-responsive CSS: enhanced media queries, touch-friendly targets, safe-area insets.
+- Prometheus metrics: (already in v1.1.34) `/metrics` endpoint wired.
+
 ## [1.1.35] - 2026-11-21
 
 ### Fixed

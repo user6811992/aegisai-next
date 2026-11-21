@@ -19,6 +19,10 @@ body {
   .header-bar { flex-wrap: wrap; gap: 0.5rem; }
   .header-bar h1 { font-size: 1rem; }
   .tab-bar button { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+  .settings-modal { width: 95vw !important; max-width: 95vw !important; padding: 1rem !important; }
+  .input-row { flex-direction: column; gap: 0.5rem; }
+  .input-row input { width: 100%; }
+  .input-row button { width: 100%; }
 }
 
 /* Light theme */
