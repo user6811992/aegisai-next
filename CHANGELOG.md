@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.39] - 2026-11-21
+
+### Changed
+- Cookie-only auth: removed all localStorage token references. Auth uses httpOnly cookies exclusively.
+
 ## [1.1.38] - 2026-11-21
 
 ### Changed
