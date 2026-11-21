@@ -228,7 +228,11 @@ async function backendShowModel(name) {
 
 async function backendChat(bodyObj, onChunk, signal) {
   if (!isOpenaiCompat()) {
-    return ollamaStream('/api/chat', bodyObj, onChunk, signal);
+    const ollamaBody = Object.assign({}, bodyObj);
+    if (bodyObj.maxTokens && bodyObj.maxTokens > 0) {
+      ollamaBody.options = Object.assign({}, bodyObj.options || {}, { num_predict: bodyObj.maxTokens });
+    }
+    return ollamaStream('/api/chat', ollamaBody, onChunk, signal);
   }
   const oaiBody = {
     model: bodyObj.model,
@@ -236,9 +240,8 @@ async function backendChat(bodyObj, onChunk, signal) {
     stream: bodyObj.stream !== false,
     temperature: bodyObj.options && bodyObj.options.temperature,
   };
-  if (bodyObj.tools && bodyObj.tools.length) {
-    oaiBody.tools = bodyObj.tools;
-    oaiBody.tool_choice = 'auto';
+  if (bodyObj.maxTokens && bodyObj.maxTokens > 0) {
+    oaiBody.max_tokens = bodyObj.maxTokens;
   }
   const chatHeaders = { 'Content-Type': 'application/json' };
   if (state.apiKey) chatHeaders['Authorization'] = 'Bearer ' + state.apiKey;

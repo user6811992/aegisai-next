@@ -192,6 +192,39 @@ const server = http.createServer(async (req, res) => {
       if (body.messages !== undefined && !Array.isArray(body.messages)) {
         return json(res, 400, { ok: false, error: 'messages must be an array' });
       }
+      const s = settings.load();
+      // Cost control defaults from settings (overridable per request).
+      const fallbackModels = Array.isArray(body.fallbackModels) ? body.fallbackModels : (Array.isArray(s.fallbackModels) ? s.fallbackModels : []);
+      const maxHistory = (typeof body.maxHistory === 'number' && body.maxHistory > 0) ? body.maxHistory : (s.maxHistory || 20);
+      const maxTokens = (typeof body.maxTokens === 'number' && body.maxTokens >= 0) ? body.maxTokens : (s.maxTokens || 0);
+      const includeMemories = (body.includeMemories !== undefined) ? !!body.includeMemories : !!s.includeMemories;
+      // Optional RAG memory injection: retrieve top-K relevant memories.
+      if (includeMemories && Array.isArray(body.messages) && body.messages.length > 0) {
+        try {
+          const lastUser = [...body.messages].reverse().find((m) => m.role === 'user');
+          const q = (lastUser && lastUser.content) || '';
+          if (q) {
+            const url = (backends.getUrl() || 'http://127.0.0.1:11434') + '/api/embeddings';
+            const er = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: body.embedModel || 'nomic-embed-text', prompt: q }) });
+            const ed = await er.json();
+            const qEmb = ed.embedding;
+            if (qEmb) {
+              const mems = db.listMemories();
+              const topK = (typeof body.memoryTopK === 'number' && body.memoryTopK > 0) ? body.memoryTopK : (s.memoryTopK || 5);
+              const scored = mems.filter((m) => m.embedding).map((m) => {
+                const a = qEmb, b = m.embedding;
+                let dot = 0, na = 0, nb = 0;
+                for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+                return { m, score: (na && nb) ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0 };
+              }).sort((x, y) => y.score - x.score).slice(0, topK);
+              if (scored.length) {
+                const ctx = 'Relevant memories:\n' + scored.map((x) => '- ' + x.m.text).join('\n');
+                body.messages = [{ role: 'system', content: ctx }, ...body.messages];
+              }
+            }
+          }
+        } catch (e) {}
+      }
       // Gather external tools from available integrations.
       const avail = await integrations.registry.available();
       const ext = { ghidra: [], craft: [], are: [], rea: [] };
@@ -203,7 +236,6 @@ const server = http.createServer(async (req, res) => {
         else if (i.name === 'rea') ext.rea = ts;
       }
       // REA tools namespaced as rea_ in agent; map them into ext.rea (already).
-      const s = settings.load();
       const reqBudget = parseInt(body.toolBudget, 10);
       const toolBudget = (Number.isFinite(reqBudget) && reqBudget > 0) ? reqBudget : (s.toolBudget || config.TOOL_BUDGET);
       // Server-Sent Events stream
@@ -230,6 +262,9 @@ const server = http.createServer(async (req, res) => {
           allowedTools: body.allowedTools,
           deniedTools: body.deniedTools,
           externalTools: body.externalTools || ext,
+          fallbackModels,
+          maxHistory,
+          maxTokens,
           onEvent: (e) => send(e),
           signal,
         });

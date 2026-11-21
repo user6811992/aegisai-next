@@ -605,6 +605,16 @@ export default function App() {
               <label>Auth token (Docker):</label>
               <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" placeholder="paste AEGISAI_TOKEN" defaultValue={localStorage.getItem('aegisai_token') || ''} onChange={(e) => { const v = e.target.value.trim(); if (v) localStorage.setItem('aegisai_token', v); else localStorage.removeItem('aegisai_token'); }} />
             </div>
+            <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
+              <label>Max history (msgs):</label>
+              <input class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" defaultValue={20} onChange={async (e) => { const v = parseInt(e.target.value, 10); if (v > 0) { const cfg = await (await fetch('/api/settings')).json(); cfg.maxHistory = v; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }); } }} />
+              <label>Max tokens:</label>
+              <input class="w-16 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" defaultValue={0} placeholder="0=unlimited" onChange={async (e) => { const v = parseInt(e.target.value, 10); if (v >= 0) { const cfg = await (await fetch('/api/settings')).json(); cfg.maxTokens = v; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }); } }} />
+            </div>
+            <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
+              <label>Fallback models (comma-sep):</label>
+              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" placeholder="e.g. llama3.2:3b,mistral:7b" onChange={async (e) => { const v = e.target.value.trim(); const models = v ? v.split(',').map((x) => x.trim()).filter(Boolean) : []; const cfg = await (await fetch('/api/settings')).json(); cfg.fallbackModels = models; await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }); }} />
+            </div>
             <div class="mt-3 flex gap-2">
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/versions'); const d = await r.json(); alert('AegisAI: ' + d.aegisai + '\nNode: ' + d.node + '\nOllama: ' + d.ollama + '\nREA: ' + (d.rea && d.rea.toolCount) + ' tools'); }}>Check versions</button>
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/error-log'); const d = await r.json(); alert((d.content || '').slice(-1000) || 'No errors logged'); }}>View error log</button>

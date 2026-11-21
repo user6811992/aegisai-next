@@ -33,10 +33,22 @@ async function runAgent(opts) {
     onEvent = () => {},
     signal,
     externalTools = { ghidra: [], craft: [], are: [], rea: [] },
+    fallbackModels = [],
+    maxHistory = 20,
+    maxTokens = 0,
   } = opts;
 
   const toolLog = [];
   const msgs = [...(messages || [])];
+  // Cost control: truncate conversation history to the last N messages
+  // (always preserving system messages).
+  if (maxHistory > 0 && msgs.length > maxHistory) {
+    const systemMsgs = msgs.filter((m) => m.role === 'system');
+    const others = msgs.filter((m) => m.role !== 'system');
+    const kept = others.slice(-maxHistory);
+    msgs.length = 0;
+    msgs.push(...systemMsgs, ...kept);
+  }
   let tools = [];
 
   // assemble coding tools
@@ -83,20 +95,32 @@ async function runAgent(opts) {
     iterations += 1;
     onEvent({ type: 'status', message: 'calling model' });
     let resp;
-    try {
-      resp = await backends.backendChat({ model, messages: msgs, tools, stream: true }, (e) => onEvent(e), signal);
-    } catch (e) {
-      // Retry without tools (vision models like moondream don't support tool calls)
-      if (tools && tools.length > 0) {
-        try {
-          tools = [];
-          resp = await backends.backendChat({ model, messages: msgs, tools: [], stream: true }, (e) => onEvent(e), signal);
-        } catch (e2) {
-          return { final: { type: 'done', final: 'error: ' + (e2.message || e2), toolLog }, toolLog };
+    const modelsToTry = [model].concat(Array.isArray(fallbackModels) ? fallbackModels : []).filter(Boolean);
+    let lastErr = null;
+    for (let mi = 0; mi < modelsToTry.length; mi++) {
+      const m = modelsToTry[mi];
+      if (mi > 0) onEvent({ type: 'status', message: 'falling back to ' + m });
+      try {
+        resp = await backends.backendChat({ model: m, messages: msgs, tools, stream: true, maxTokens }, (e) => onEvent(e), signal);
+        break;
+      } catch (e) {
+        // Retry without tools (vision models like moondream don't support tool calls)
+        if (tools && tools.length > 0) {
+          try {
+            resp = await backends.backendChat({ model: m, messages: msgs, tools: [], stream: true, maxTokens }, (e) => onEvent(e), signal);
+            tools = [];
+            break;
+          } catch (e2) {
+            lastErr = e2;
+            continue;
+          }
         }
-      } else {
-        return { final: { type: 'done', final: 'error: ' + (e.message || e), toolLog }, toolLog };
+        lastErr = e;
+        continue;
       }
+    }
+    if (!resp) {
+      return { final: { type: 'done', final: 'error: ' + ((lastErr && (lastErr.message || lastErr)) || 'all models failed'), toolLog }, toolLog };
     }
     const data = resp && resp.data ? resp.data : resp;
     const msg = (data && data.message) || {};

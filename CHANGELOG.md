@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.16] - 2026-11-21
+
+### Fixed
+- Fixed duplicate `const s` declaration in `/api/agent` (SyntaxError that broke all tests).
+- Renamed shadowed variable in RAG memory injection.
+
+## [1.1.15] - 2026-11-21
+
+### Added
+- Model fallback: `fallbackModels` setting + retry logic in `runAgent` (tries next model on failure).
+- Cost reduction: history truncation (`maxHistory`), `maxTokens` cap, RAG memory injection (`includeMemories`), all configurable in Settings.
+
 ## [1.1.14] - 2026-11-21
 
 ### Fixed
