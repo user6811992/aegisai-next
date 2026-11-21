@@ -104,6 +104,10 @@ const server = http.createServer(async (req, res) => {
     const rl = require('./server/core/ratelimit');
     if (!rl.check(req, res)) return;
     const url = req.url.split('?')[0];
+    // Health check (no auth, for Docker/K8s probes).
+    if (url === '/api/health' && req.method === 'GET') {
+      return json(res, 200, { ok: true, version: VERSION, uptime: process.uptime() });
+    }
     if (url === '/api/versions' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const { runProcess } = require('./server/core/security');
@@ -225,6 +229,38 @@ const server = http.createServer(async (req, res) => {
           }
         } catch (e) {}
       }
+      // Optional document RAG injection.
+      const includeDocs = (body.includeDocuments !== undefined) ? !!body.includeDocuments : !!s.includeDocuments;
+      if (includeDocs && Array.isArray(body.messages) && body.messages.length > 0) {
+        try {
+          const lastUser = [...body.messages].reverse().find((m) => m.role === 'user');
+          const q = (lastUser && lastUser.content) || '';
+          if (q && db.listAllDocChunks().length) {
+            const er = await fetch((backends.getUrl() || 'http://127.0.0.1:11434') + '/api/embeddings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: body.embedModel || 'nomic-embed-text', prompt: q }), signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined });
+            const ed = await er.json();
+            const qEmb = ed.embedding;
+            if (qEmb) {
+              const topK = (typeof body.docTopK === 'number' && body.docTopK > 0) ? body.docTopK : (s.docTopK || 5);
+              const chunks = db.listAllDocChunks();
+              const scored = chunks.filter((c) => c.embedding).map((c) => {
+                let emb; try { emb = JSON.parse(c.embedding); } catch (e) { emb = null; }
+                if (!emb) return { c, score: 0 };
+                const a = qEmb, b = emb;
+                let dot = 0, na = 0, nb = 0;
+                for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+                return { c, score: (na && nb) ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0 };
+              }).sort((x, y) => y.score - x.score).slice(0, topK);
+              if (scored.length) {
+                const ctx = 'Relevant document excerpts:\n' + scored.map((x) => '- ' + x.c.text.slice(0, 400)).join('\n');
+                // Prepend to existing system message or create new
+                const sysIdx = body.messages.findIndex((m) => m.role === 'system');
+                if (sysIdx >= 0) body.messages[sysIdx].content += '\n\n' + ctx;
+                else body.messages = [{ role: 'system', content: ctx }, ...body.messages];
+              }
+            }
+          }
+        } catch (e) {}
+      }
       // Gather external tools from available integrations.
       const avail = await integrations.registry.available();
       const ext = { ghidra: [], craft: [], are: [], rea: [] };
@@ -314,6 +350,78 @@ const server = http.createServer(async (req, res) => {
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       db.deleteMemory(body.id);
       return json(res, 200, { ok: true });
+    }
+    // ---------- Documents (PDF/DOCX text extraction + RAG) ----------
+    if (url === '/api/documents' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { documents: db.listDocuments() });
+    }
+    if (url === '/api/documents/upload' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (!body.data) return json(res, 400, { ok: false, error: 'data (base64) required' });
+      let buf;
+      try { buf = Buffer.from(body.data, 'base64'); } catch (e) { return json(res, 400, { ok: false, error: 'invalid base64' }); }
+      if (buf.length > 50 * 1024 * 1024) return json(res, 413, { ok: false, error: 'file too large (>50MB)' });
+      const pdfParse = require('pdf-parse');
+      let text = '';
+      try {
+        const data = await pdfParse(buf);
+        text = data.text || '';
+      } catch (e) {
+        return json(res, 400, { ok: false, error: 'failed to parse PDF: ' + (e.message || e) });
+      }
+      if (!text.trim()) return json(res, 400, { ok: false, error: 'no text extracted' });
+      const docId = db.saveDocument({ name: body.name || 'document.pdf' });
+      // Chunk into ~800-char pieces with overlap.
+      const CHUNK = 800;
+      const chunks = [];
+      for (let i = 0; i < text.length; i += CHUNK) {
+        chunks.push(text.slice(i, i + CHUNK));
+      }
+      // Embed each chunk (best-effort; store null if embedding fails).
+      const embedUrl = (backends.getUrl() || 'http://127.0.0.1:11434') + '/api/embeddings';
+      for (let ci = 0; ci < chunks.length; ci++) {
+        let emb = null;
+        try {
+          const er = await fetch(embedUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: body.embedModel || 'nomic-embed-text', prompt: chunks[ci] }), signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined });
+          const ed = await er.json();
+          emb = ed.embedding || null;
+        } catch (e) {}
+        db.saveDocChunk({ doc_id: docId, chunk_index: ci, text: chunks[ci], embedding: emb });
+      }
+      return json(res, 200, { ok: true, id: docId, name: body.name || 'document.pdf', chunks: chunks.length });
+    }
+    if (url === '/api/documents/delete' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      db.deleteDocument(body.id);
+      return json(res, 200, { ok: true });
+    }
+    if (url === '/api/documents/search' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const q = body.query || '';
+      const topK = body.limit || 5;
+      const chunks = db.listAllDocChunks();
+      if (!q) return json(res, 200, { results: chunks.slice(0, topK).map((c) => ({ text: c.text, score: 0 })) });
+      // Embed query
+      let qEmb = null;
+      try {
+        const er = await fetch((backends.getUrl() || 'http://127.0.0.1:11434') + '/api/embeddings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: body.embedModel || 'nomic-embed-text', prompt: q }), signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined });
+        const ed = await er.json();
+        qEmb = ed.embedding;
+      } catch (e) {}
+      if (!qEmb) return json(res, 200, { results: chunks.slice(0, topK).map((c) => ({ text: c.text, score: 0 })) });
+      const scored = chunks.filter((c) => c.embedding).map((c) => {
+        let emb; try { emb = JSON.parse(c.embedding); } catch (e) { emb = null; }
+        if (!emb) return { c, score: 0 };
+        const a = qEmb, b = emb;
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < Math.min(a.length, b.length); i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+        return { c, score: (na && nb) ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0 };
+      }).sort((x, y) => y.score - x.score).slice(0, topK);
+      return json(res, 200, { results: scored.map((s) => ({ text: s.c.text, score: s.score })) });
     }
     // ---------- Skills ----------
     if (url === '/api/skills' && req.method === 'GET') {
@@ -907,6 +1015,16 @@ async function start() {
 }
 
 if (require.main === module) {
+  const shutdown = (sig) => {
+    console.log(sig + ' received, shutting down gracefully...');
+    server.close(() => {
+      try { db.close(); } catch (e) {}
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('uncaughtException', (e) => {
     try { require('fs').appendFileSync(require('./server/core/config').DATA_DIR + '/error.log', new Date().toISOString() + ' uncaughtException: ' + (e && e.stack ? e.stack : e) + '\n'); } catch (_) {}
     console.error('uncaughtException:', e);

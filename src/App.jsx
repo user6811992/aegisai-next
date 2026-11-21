@@ -28,6 +28,7 @@ export default function App() {
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [busy, setBusy] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [abortCtrl, setAbortCtrl] = useState(null);
   const [settingsCfg, setSettingsCfg] = useState({});
   const [integrations, setIntegrations] = useState({});
   const [tab, setTab] = useState('chat');
@@ -57,6 +58,8 @@ export default function App() {
   const [areLanguage, setAreLanguage] = useState('');
   const [areMinStars, setAreMinStars] = useState(0);
   const [areReadme, setAreReadme] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [includeDocuments, setIncludeDocuments] = useState(false);
   const [ragQuery, setRagQuery] = useState('');
   const [ragResults, setRagResults] = useState([]);
   const [toolLog, setToolLog] = useState([]);
@@ -64,6 +67,7 @@ export default function App() {
 
   const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
   const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
+  const refreshDocuments = () => fetch('/api/documents').then((r) => r.json()).then((d) => setDocuments(d.documents || [])).catch(() => {});
   const loadChats = () => fetch('/api/chats').then((r) => r.json()).then((d) => setChats(d.chats || [])).catch(() => {});
   const newChat = () => { setMessages([]); setChatId(null); setBranches([]); setToolLog([]); };
 
@@ -79,6 +83,7 @@ export default function App() {
     fetch('/api/integrations/status').then((r) => r.json()).then((d) => { fetch('/api/backend').then((r) => r.json()).then((b) => safe(() => setIntegrations({ ...d, _backend: b }))).catch(() => safe(() => setIntegrations(d))); }).catch(() => {});
     refreshMemory();
     refreshSkills();
+    refreshDocuments();
     loadChats();
     return () => { cancelled = true; };
   }, []);
@@ -97,6 +102,8 @@ export default function App() {
     setMessages(next);
     setInput('');
     setBusy(true);
+    const ctrl = new AbortController();
+    setAbortCtrl(ctrl);
     const assistant = { role: 'assistant', content: '' };
     setMessages([...next, assistant]);
     let cfg = {};
@@ -105,7 +112,8 @@ export default function App() {
       const res = await fetch('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false, cleanRoom }),
+        body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false, cleanRoom, includeDocuments }),
+        signal: ctrl.signal,
       });
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -181,6 +189,7 @@ export default function App() {
       setMessages([...next, { ...assistant }]);
     } finally {
       setBusy(false);
+      setAbortCtrl(null);
     }
   }
 
@@ -301,7 +310,7 @@ export default function App() {
         <span class="text-xs text-gray-400">v{version}</span>
         <nav class="ml-4 flex gap-2">
           <button class="text-sm px-2 py-1 rounded text-gray-300 hover:bg-gray-700" onClick={() => { setShowSidebar((s) => !s); loadChats(); }}>Chats</button>
-          {['chat', 'memory', 'skills', 'are', 'models'].map((t) => (
+          {['chat', 'memory', 'skills', 'are', 'models', 'documents'].map((t) => (
             <button key={t} class={`text-sm px-2 py-1 rounded ${tab === t ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={() => setTab(t)}>{t}</button>
           ))}
         </nav>
@@ -384,11 +393,12 @@ export default function App() {
                 rec.start();
               }}>🎤</button>
               <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-400" value={input} onInput={(e) => setInput(e.target.value)} onKeyDown={(e) => {
-                if (e.key === 'Enter') { send(); }
+                if (e.key === 'Enter') { send(); } else if (e.key === 'Escape' && busy) { e.preventDefault(); abortCtrl?.abort(); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); if (inputHistory.length === 0) return; const newIdx = historyIdx === -1 ? inputHistory.length - 1 : Math.max(0, historyIdx - 1); setHistoryIdx(newIdx); setInput(inputHistory[newIdx]); }
                 else if (e.key === 'ArrowDown') { e.preventDefault(); if (historyIdx === -1) return; const newIdx = historyIdx + 1; if (newIdx >= inputHistory.length) { setHistoryIdx(-1); setInput(''); } else { setHistoryIdx(newIdx); setInput(inputHistory[newIdx]); } }
-              }} placeholder="Message… (↑↓ history)" disabled={busy} />
+              }} placeholder="Message… (↑↓ history, Esc stop)" disabled={busy} />
               <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={send} disabled={busy}>Send</button>
+              {busy && <button class="bg-red-600 text-white rounded px-4 py-2 text-sm" onClick={() => abortCtrl?.abort()}>Stop</button>}
             </div>
           </footer>
         </>
@@ -448,6 +458,43 @@ export default function App() {
               </div>
             </div>
           ))}
+        </main>
+      )}
+
+      {tab === 'documents' && (
+        <main class="flex-1 overflow-auto p-4 max-w-3xl w-full mx-auto space-y-3">
+          <div class={`space-y-2 border border-gray-700 rounded p-3 ${card}`}>
+            <div class="text-sm text-gray-200 font-medium">Upload PDF</div>
+            <input type="file" accept="application/pdf" class="text-sm text-gray-300" onChange={async (e) => {
+              const f = e.target.files[0]; if (!f) return;
+              const buf = await f.arrayBuffer();
+              const bytes = new Uint8Array(buf);
+              let binary = '';
+              const chunkSize = 0x8000;
+              for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+              }
+              const b64 = btoa(binary);
+              const r = await fetch('/api/documents/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data: b64 }) });
+              const d = await r.json();
+              if (d.ok) { alert('Uploaded: ' + d.name + ' (' + d.chunks + ' chunks)'); refreshDocuments(); }
+              else { alert('Upload failed: ' + (d.error || 'unknown')); }
+              e.target.value = '';
+            }} />
+            <label class="flex items-center gap-2 text-xs text-gray-300 mt-2">
+              <input type="checkbox" checked={includeDocuments} onChange={(e) => setIncludeDocuments(e.target.checked)} /> Include documents in chat context
+            </label>
+          </div>
+          {documents.map((d) => (
+            <div key={d.id} class={`${card} p-3 flex justify-between items-start`}>
+              <div>
+                <div class="font-medium text-sm text-gray-100">{d.name}</div>
+                <div class="text-xs text-gray-400">{d.created}</div>
+              </div>
+              <button class="text-red-400 text-xs" onClick={async () => { await fetch('/api/documents/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: d.id }) }); refreshDocuments(); }}>del</button>
+            </div>
+          ))}
+          {documents.length === 0 && <div class="text-xs text-gray-500">No documents uploaded.</div>}
         </main>
       )}
 

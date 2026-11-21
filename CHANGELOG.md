@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.21] - 2026-11-21
+
+### Added
+- Streaming cancellation: Stop button + Escape key aborts in-flight generation.
+- Document RAG: PDF upload, text extraction, chunking, embedding, and RAG injection into chat context.
+- Health check endpoint: `GET /api/health` (no auth, for Docker/K8s probes).
+- Graceful shutdown: SIGTERM/SIGINT handlers close server and DB.
+- Keyboard shortcuts: Enter to send, Esc to stop.
+
 ## [1.1.20] - 2026-11-21
 
 ### Fixed

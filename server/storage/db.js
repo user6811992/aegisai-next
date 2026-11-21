@@ -60,6 +60,20 @@ function open(dbPath) {
       created TEXT NOT NULL,
       updated TEXT
     );
+    CREATE TABLE IF NOT EXISTS documents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS doc_chunks (
+      id TEXT PRIMARY KEY,
+      doc_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      embedding TEXT,
+      FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_doc_chunks_doc ON doc_chunks(doc_id);
   `);
   return db;
 }
@@ -159,6 +173,28 @@ function saveSkill(s) {
 }
 function deleteSkill(name) { run('DELETE FROM skills WHERE name = ?', [name]); }
 
+// ---------- Documents ----------
+function listDocuments() { return all('SELECT id, name, created FROM documents ORDER BY created DESC'); }
+function getDocument(id) { return one('SELECT id, name, created FROM documents WHERE id = ?', [id]); }
+function saveDocument(doc) {
+  const id = doc.id || ('doc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+  const existing = one('SELECT id FROM documents WHERE id = ?', [id]);
+  if (!existing) run('INSERT INTO documents (id, name, created) VALUES (?,?,?)', [id, doc.name, doc.created || new Date().toISOString()]);
+  return id;
+}
+function deleteDocument(id) {
+  run('DELETE FROM doc_chunks WHERE doc_id = ?', [id]);
+  run('DELETE FROM documents WHERE id = ?', [id]);
+}
+function listDocChunks(docId) { return all('SELECT id, doc_id, chunk_index, text, embedding FROM doc_chunks WHERE doc_id = ? ORDER BY chunk_index', [docId]); }
+function saveDocChunk(chunk) {
+  const id = chunk.id || ('chk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+  run('INSERT INTO doc_chunks (id, doc_id, chunk_index, text, embedding) VALUES (?,?,?,?,?)', [id, chunk.doc_id, chunk.chunk_index, chunk.text, chunk.embedding ? JSON.stringify(chunk.embedding) : null]);
+  return id;
+}
+function listAllDocChunks() { return all('SELECT id, doc_id, chunk_index, text, embedding FROM doc_chunks'); }
+function docCount() { return one('SELECT COUNT(*) AS n FROM documents').n; }
+
 // ---------- Migration from JSON ----------
 function migrateFromJson(dataDir) {
   const fs2 = require('fs');
@@ -193,4 +229,5 @@ function close() { if (db) { db.close(); db = null; } }
 module.exports = { open, get, isOpen, close, migrateFromJson, backend,
   listChats, getChat, saveChat, deleteChat, listBranches, chatCount,
   listMemories, getMemory, saveMemory, deleteMemory, memoryCount,
-  listSkills, getSkill, saveSkill, deleteSkill };
+  listSkills, getSkill, saveSkill, deleteSkill,
+  listDocuments, getDocument, saveDocument, deleteDocument, listDocChunks, saveDocChunk, listAllDocChunks, docCount };
