@@ -134,6 +134,8 @@ function close() { if (db) { db.close(); db = null; } }
 // ---------- Chats ----------
 function one(sql, params) { return db.prepare(sql).get(...(params || [])); }
 function all(sql, params) { return db.prepare(sql).all(...(params || [])); }
+/**
+ * Run a SQL statement. @param {string} sql @param {any[]} [params] */
 function run(sql, params) { db.prepare(sql).run(...(params || [])); }
 
 function rowToChat(r) {

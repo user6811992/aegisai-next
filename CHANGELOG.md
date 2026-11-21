@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.48] - 2026-11-21
+
+### Changed
+- Enhanced mobile-responsive CSS with comprehensive breakpoints.
+- Added JSDoc annotations to db.js (run function).
+
 ## [1.1.47] - 2026-11-21
 
 ### Added
