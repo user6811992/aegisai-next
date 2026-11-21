@@ -3,6 +3,31 @@ import { useState, useEffect } from 'preact/hooks';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
+// Retry a fetch up to `retries` times with exponential backoff.
+async function fetchWithRetry(url, opts, retries = 2) {
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url, opts);
+      if (res.ok || res.status < 500) return res;
+      lastErr = new Error('HTTP ' + res.status);
+    } catch (e) { lastErr = e; }
+    if (i < retries) await new Promise((r) => setTimeout(r, 500 * Math.pow(2, i)));
+  }
+  throw lastErr || new Error('fetch failed');
+}
+
+function friendlyError(e) {
+  const msg = String((e && e.message) || e || '');
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Network error — is the server running?';
+  if (/401|unauthorized/i.test(msg)) return 'Unauthorized — check your auth token in Settings.';
+  if (/404/i.test(msg)) return 'Not found — the requested resource or model may not exist.';
+  if (/500/i.test(msg)) return 'Server error — check the error log in Settings.';
+  if (/timeout|aborted/i.test(msg)) return 'Request timed out — the model may be too slow or unavailable.';
+  if (/rate limit/i.test(msg)) return 'Rate limited — please wait a moment and try again.';
+  return msg || 'Unknown error';
+}
+
 // Attach auth token from localStorage to every request (needed for token-protected / Docker deployments).
 const _origFetch = (typeof window !== 'undefined' && window.fetch) ? window.fetch.bind(window) : null;
 if (_origFetch) {
@@ -27,6 +52,7 @@ export default function App() {
   const [inputHistory, setInputHistory] = useState([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [busy, setBusy] = useState(false);
+  const [loadingChats, setLoadingChats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [abortCtrl, setAbortCtrl] = useState(null);
   const [settingsCfg, setSettingsCfg] = useState({});
@@ -41,6 +67,7 @@ export default function App() {
   const [chatId, setChatId] = useState(null);
   const [chats, setChats] = useState([]);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [chatSearch, setChatSearch] = useState('');
   const [branches, setBranches] = useState([]);
   const [parentId, setParentId] = useState(null);
   const [cleanRoom, setCleanRoom] = useState(false);
@@ -69,7 +96,7 @@ export default function App() {
   const refreshMemory = () => fetch('/api/memory').then((r) => r.json()).then((d) => setMemories(d.memories || [])).catch(() => {});
   const refreshSkills = () => fetch('/api/skills').then((r) => r.json()).then((d) => setSkills(d.skills || [])).catch(() => {});
   const refreshDocuments = () => fetch('/api/documents').then((r) => r.json()).then((d) => setDocuments(d.documents || [])).catch(() => {});
-  const loadChats = () => fetch('/api/chats').then((r) => r.json()).then((d) => setChats(d.chats || [])).catch(() => {});
+  const loadChats = () => { setLoadingChats(true); fetch('/api/chats').then((r) => r.json()).then((d) => setChats(d.chats || [])).catch(() => {}).finally(() => setLoadingChats(false)); };
   const newChat = () => { setMessages([]); setChatId(null); setBranches([]); setToolLog([]); };
 
   useEffect(() => {
@@ -113,7 +140,7 @@ export default function App() {
     let cfg = {};
     try { cfg = await (await fetch('/api/settings')).json(); } catch (e) {}
     try {
-      const res = await fetch('/api/agent', {
+      const res = await fetchWithRetry('/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false, cleanRoom, includeDocuments }),
@@ -190,7 +217,7 @@ export default function App() {
       } catch (e) {}
     } catch (e) {
       console.error('send() error:', e);
-      assistant.content = 'Error: ' + (e.message || e);
+      assistant.content = 'Error: ' + friendlyError(e);
       setMessages([...next, { ...assistant }]);
     } finally {
       setBusy(false);
@@ -321,7 +348,11 @@ export default function App() {
             <button class="text-gray-400 hover:text-white" onClick={() => setShowSidebar(false)}>✕</button>
           </div>
           <button class="w-full text-left text-sm bg-blue-600 text-white rounded px-3 py-2 mb-2" onClick={() => { newChat(); setShowSidebar(false); }}>+ New chat</button>
-          {chats.map((c) => (
+          <input class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-xs text-gray-100 placeholder-gray-400 mb-2" value={chatSearch} onInput={(e) => setChatSearch(e.target.value)} placeholder="Search chats…" />
+          {loadingChats && chats.length === 0 && [1,2,3].map((i) => (
+            <div key={i} class="w-full h-8 bg-gray-700/50 rounded animate-pulse mb-1" />
+          ))}
+          {chats.filter((c) => !chatSearch || (c.title || '').toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
             <button key={c.id} class={`w-full text-left text-xs rounded px-3 py-2 truncate ${chatId === c.id ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={async () => { const r = await fetch('/api/chats/' + c.id); const d = await r.json(); setMessages(d.messages || []); setChatId(c.id); setShowSidebar(false); loadChats(); }}>
               {c.title || 'Untitled'}
             </button>
@@ -439,6 +470,16 @@ export default function App() {
                   e.target.value = '';
                 }} />
               </label>
+              <button class="bg-gray-700 text-gray-200 rounded px-3 py-2 text-sm hover:bg-gray-600" title="Voice input" onClick={() => {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) { alert('Speech recognition not supported in this browser'); return; }
+                const rec = new SR();
+                rec.lang = 'en-US';
+                rec.interimResults = false;
+                rec.onresult = (e) => { const t = e.results[0][0].transcript; setInput((prev) => (prev + ' ' + t).trim()); };
+                rec.onerror = (e) => alert('Voice error: ' + e.error);
+                rec.start();
+              }}>🎤</button>
               <button class="bg-blue-600 text-white rounded px-4 py-2 text-sm disabled:opacity-50" onClick={() => send()} disabled={busy}>Send</button>
               {busy && <button class="bg-red-600 text-white rounded px-4 py-2 text-sm" onClick={() => abortCtrl?.abort()}>Stop</button>}
             </div>

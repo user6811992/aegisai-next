@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.24] - 2026-11-21
+
+### Added
+- Retry on failure: fetchWithRetry with exponential backoff for agent requests.
+- Error translation: friendly error messages instead of raw errors.
+- Loading skeletons: animated placeholders while chats load.
+- Chat search: filter chats by title in sidebar.
+- Voice input: 🎤 mic button using browser SpeechRecognition.
+
 ## [1.1.23] - 2026-11-21
 
 ### Added
