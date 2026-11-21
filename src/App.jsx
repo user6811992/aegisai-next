@@ -410,6 +410,7 @@ export default function App() {
             {models.map((m) => <option value={m}>{m}</option>)}
           </select>
           <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={() => setShowSettings((s) => !s)}>Settings</button>
+           <button id="installBtn" class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" style="display:none" onClick={() => { if (window.deferredPrompt) { window.deferredPrompt.prompt(); window.deferredPrompt.userChoice.then(() => { window.deferredPrompt = null; const btn = document.getElementById('installBtn'); if (btn) btn.style.display = 'none'; }); } }}>Install app</button>
         </div>
       </header>
 

@@ -21,6 +21,23 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// PWA install prompt
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  window.deferredPrompt = e;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = 'block';
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  window.deferredPrompt = null;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = 'none';
+});
+
 try {
   render(<App />, document.getElementById('app'));
 } catch (e) {

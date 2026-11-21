@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.51] - 2026-11-21
+
+### Added
+- PWA install prompt: "Install app" button appears when browser supports installation.
+- App icons: generated 192x192 and 512x512 PNG icons for PWA manifest.
+- Service worker: offline caching + update detection.
+
 ## [1.1.50] - 2026-11-21
 
 ### Added
