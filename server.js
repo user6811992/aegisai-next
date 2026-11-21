@@ -108,6 +108,30 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/health' && req.method === 'GET') {
       return json(res, 200, { ok: true, version: VERSION, uptime: process.uptime() });
     }
+    if (url === '/api/openapi.json' && req.method === 'GET') {
+      const fs = require('fs');
+      const path = require('path');
+      try { return json(res, 200, JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'openapi.json'), 'utf8'))); }
+      catch (e) { return json(res, 404, { ok: false, error: 'not found' }); }
+    }
+    if (url === '/api/compare' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      const messages = Array.isArray(body.messages) ? body.messages : [{ role: 'user', content: body.prompt || '' }];
+      const models = Array.isArray(body.models) ? body.models.slice(0, 2) : [];
+      if (models.length < 2) return json(res, 400, { ok: false, error: 'need two models' });
+      const results = [];
+      for (const m of models) {
+        try {
+          const r = await backends.backendChat({ model: m, messages, stream: false }, () => {});
+          const d = r && r.data ? r.data : r;
+          results.push({ model: m, ok: true, content: (d && d.message && d.message.content) || '', tokens: { prompt: d && d.prompt_eval_count, generated: d && d.eval_count } });
+        } catch (e) {
+          results.push({ model: m, ok: false, error: String(e.message || e) });
+        }
+      }
+      return json(res, 200, { ok: true, results });
+    }
     if (url === '/api/versions' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const { runProcess } = require('./server/core/security');
@@ -322,6 +346,7 @@ const server = http.createServer(async (req, res) => {
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       if (!body.text) return json(res, 400, { ok: false, error: 'text required' });
       const id = db.saveMemory({ id: body.id, text: body.text, source: body.source || 'manual', tags: body.tags || [] });
+      db.logAudit('memory.save', { id, text: body.text.slice(0, 80) }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true, id });
     }
     if (url === '/api/memory/extract' && req.method === 'POST') {
@@ -349,6 +374,7 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       db.deleteMemory(body.id);
+      db.logAudit('memory.delete', { id: body.id }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true });
     }
     // ---------- Documents (PDF/DOCX text extraction + RAG) ----------
@@ -390,12 +416,14 @@ const server = http.createServer(async (req, res) => {
         } catch (e) {}
         db.saveDocChunk({ doc_id: docId, chunk_index: ci, text: chunks[ci], embedding: emb });
       }
+      db.logAudit('document.upload', { id: docId, name: body.name || 'document.pdf', chunks: chunks.length }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true, id: docId, name: body.name || 'document.pdf', chunks: chunks.length });
     }
     if (url === '/api/documents/delete' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       db.deleteDocument(body.id);
+      db.logAudit('document.delete', { id: body.id }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true });
     }
     if (url === '/api/documents/search' && req.method === 'POST') {
@@ -433,6 +461,7 @@ const server = http.createServer(async (req, res) => {
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       if (!body.name) return json(res, 400, { ok: false, error: 'name required' });
       db.saveSkill({ name: body.name, description: body.description || '', code: body.code || '' });
+      db.logAudit('skill.save', { name: body.name }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true });
     }
     if (url === '/api/skills/run' && req.method === 'POST') {
@@ -453,6 +482,7 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       db.deleteSkill(body.name);
+      db.logAudit('skill.delete', { name: body.name }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true });
     }
     // ---------- Chats ----------
@@ -482,6 +512,7 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       db.deleteChat(body.id);
+      db.logAudit('chat.delete', { id: body.id }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true });
     }
     if (url === '/api/chats/branch' && req.method === 'POST') {
@@ -523,6 +554,7 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       settings.save(body);
+      db.logAudit('settings.save', {}, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true });
     }
     // ---------- Backup ----------
@@ -784,6 +816,10 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { content: text });
       } catch (e) { return json(res, 200, { content: '' }); }
     }
+    if (url === '/api/audit-log' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { entries: db.listAuditLog(200) });
+    }
     if (url === '/api/search-config' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const s = require('./server/tools/search');
@@ -1032,6 +1068,24 @@ async function start() {
   listenServer.listen(PORT, HOST, () => {
     const proto = (certPath && keyPath) ? 'https' : 'http';
     console.log(`AegisAI (next) v${VERSION} listening on ${proto}://${HOST}:${PORT}`);
+    // Scheduled backups
+    const backupInterval = parseInt(process.env.AEGISAI_BACKUP_INTERVAL || '0', 10);
+    if (backupInterval > 0) {
+      const fs = require('fs');
+      const path = require('path');
+      const backupDir = path.join(config.DATA_DIR, 'backups');
+      fs.mkdirSync(backupDir, { recursive: true });
+      setInterval(() => {
+        try {
+          const chats = db.listChats().map((c) => db.getChat(c.id));
+          const data = { version: VERSION, chats, memories: db.listMemories(), skills: db.listSkills(), settings: settings.load(), ts: new Date().toISOString() };
+          const file = path.join(backupDir, 'backup-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json');
+          fs.writeFileSync(file, JSON.stringify(data));
+          console.log('Scheduled backup written:', file);
+        } catch (e) { console.error('Scheduled backup failed:', e.message); }
+      }, backupInterval * 60 * 1000).unref();
+      console.log('Scheduled backups every', backupInterval, 'minutes');
+    }
     try { require('./server/integrations/rea').init().then(() => console.log('REA init done:', require('./server/integrations/rea').integration.status())).catch(() => {}); } catch (e) {}
   });
 }

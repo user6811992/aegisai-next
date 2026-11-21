@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.28] - 2026-11-21
+
+### Added
+- Audit log: records actions (memory/skill/settings/chat/document) with IP; `/api/audit-log` endpoint.
+- Structured logging: `server/core/logger.js` with levels and JSON mode (`AEGISAI_LOG_JSON=1`).
+- Backup scheduling: `AEGISAI_BACKUP_INTERVAL` (minutes) for automated periodic backups.
+- OpenAPI spec: `openapi.json` + `/api/openapi.json` endpoint.
+- Model comparison (A/B): `/api/compare` endpoint + "Compare models" button.
+
 ## [1.1.27] - 2026-11-21
 
 ### Fixed

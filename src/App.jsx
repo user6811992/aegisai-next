@@ -663,7 +663,7 @@ export default function App() {
             ))}
           </div>
           <div class="mt-3">
-            <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/scan-models'); const d = await r.json(); setScanResults(d.found || []); }}>Scan for models</button>
+            <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const m1 = prompt('Model 1:', models[0] || ''); if (!m1) return; const m2 = prompt('Model 2:', models[1] || ''); if (!m2) return; const q = prompt('Prompt:'); if (!q) return; const r = await fetch('/api/compare', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ models: [m1, m2], prompt: q }) }); const d = await r.json(); if (d.ok) { alert(m1 + ':\n' + (d.results[0].content || d.results[0].error) + '\n\n---\n\n' + m2 + ':\n' + (d.results[1].content || d.results[1].error)); } else { alert('Failed: ' + (d.error || 'unknown')); } }}>Compare models (A/B)</button>
           </div>
           {scanResults.length > 0 && (
             <div class="space-y-1">

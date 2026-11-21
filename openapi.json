@@ -1,0 +1,51 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AegisAI (next) API",
+    "version": "1.1.27",
+    "description": "Local-first AI web UI backend API. Auth via X-Auth-Token header (open mode if no token configured)."
+  },
+  "servers": [{ "url": "http://127.0.0.1:8080" }],
+  "components": {
+    "securitySchemes": {
+      "AuthToken": { "type": "apiKey", "in": "header", "name": "X-Auth-Token" }
+    }
+  },
+  "security": [{ "AuthToken": [] }],
+  "paths": {
+    "/api/health": { "get": { "summary": "Health check (no auth)", "responses": { "200": { "description": "OK" } } } },
+    "/api/version": { "get": { "summary": "App version", "responses": { "200": { "description": "OK" } } } },
+    "/api/versions": { "get": { "summary": "All component versions", "responses": { "200": { "description": "OK" } } } },
+    "/api/agent": { "post": { "summary": "Run agent tool-call loop (SSE stream)", "responses": { "200": { "description": "SSE stream" } } } },
+    "/api/models": { "get": { "summary": "List available models", "responses": { "200": { "description": "OK" } } } },
+    "/api/pull-model": { "post": { "summary": "Pull an Ollama model", "responses": { "200": { "description": "OK" } } } },
+    "/api/backend": { "get": { "summary": "Get backend info" }, "post": { "summary": "Switch backend" } },
+    "/api/settings": { "get": { "summary": "Get settings" }, "post": { "summary": "Save settings" } },
+    "/api/memory": { "get": { "summary": "List memories" } },
+    "/api/memory/save": { "post": { "summary": "Save memory" } },
+    "/api/memory/delete": { "post": { "summary": "Delete memory" } },
+    "/api/memory/extract": { "post": { "summary": "Extract facts from conversation" } },
+    "/api/chats": { "get": { "summary": "List chats" }, "post": { "summary": "Save chat" } },
+    "/api/chats/{id}": { "get": { "summary": "Get chat" } },
+    "/api/chats/delete": { "post": { "summary": "Delete chat" } },
+    "/api/chats/branch": { "post": { "summary": "Branch chat" } },
+    "/api/skills": { "get": { "summary": "List skills" } },
+    "/api/skills/save": { "post": { "summary": "Save skill" } },
+    "/api/skills/delete": { "post": { "summary": "Delete skill" } },
+    "/api/skills/run": { "post": { "summary": "Run skill" } },
+    "/api/documents": { "get": { "summary": "List documents" } },
+    "/api/documents/upload": { "post": { "summary": "Upload PDF" } },
+    "/api/documents/delete": { "post": { "summary": "Delete document" } },
+    "/api/documents/search": { "post": { "summary": "Search document chunks" } },
+    "/api/rag/search": { "post": { "summary": "RAG search memories" } },
+    "/api/rag/reindex": { "post": { "summary": "Reindex memories" } },
+    "/api/squeeze": { "post": { "summary": "Squeeze/summarize text or URL" } },
+    "/api/backup": { "get": { "summary": "Export backup" } },
+    "/api/backup/import": { "post": { "summary": "Import backup" } },
+    "/api/stats": { "get": { "summary": "Usage stats" } },
+    "/api/audit-log": { "get": { "summary": "Audit log entries" } },
+    "/api/error-log": { "get": { "summary": "Error log" } },
+    "/api/integrations/status": { "get": { "summary": "Integration status" } },
+    "/api/search-config": { "get": { "summary": "Get search config" }, "post": { "summary": "Set search engine" } }
+  }
+}

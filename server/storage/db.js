@@ -82,6 +82,14 @@ function open(dbPath) {
           FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_doc_chunks_doc ON doc_chunks(doc_id);
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          timestamp TEXT NOT NULL,
+          action TEXT NOT NULL,
+          details TEXT,
+          ip TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_log_ts ON audit_log(timestamp DESC);
       `);
     },
     // v2: add folder column to chats
@@ -201,6 +209,15 @@ function saveDocChunk(chunk) {
 function listAllDocChunks() { return all('SELECT id, doc_id, chunk_index, text, embedding FROM doc_chunks'); }
 function docCount() { return one('SELECT COUNT(*) AS n FROM documents').n; }
 
+// ---------- Audit Log ----------
+function logAudit(action, details, ip) {
+  try { run('INSERT INTO audit_log (timestamp, action, details, ip) VALUES (?,?,?,?)', [new Date().toISOString(), action, typeof details === 'string' ? details : JSON.stringify(details || {}), ip || null]); } catch (e) {}
+}
+function listAuditLog(limit) {
+  const n = Math.max(1, Math.min(limit || 100, 1000));
+  return all('SELECT id, timestamp, action, details, ip FROM audit_log ORDER BY id DESC LIMIT ?', [n]);
+}
+
 // ---------- Migration from JSON ----------
 function migrateFromJson(dataDir) {
   const fs2 = require('fs');
@@ -234,4 +251,5 @@ module.exports = { open, get, isOpen, close, migrateFromJson, backend,
   listChats, getChat, saveChat, deleteChat, listBranches, chatCount,
   listMemories, getMemory, saveMemory, deleteMemory, memoryCount,
   listSkills, getSkill, saveSkill, deleteSkill,
-  listDocuments, getDocument, saveDocument, deleteDocument, listDocChunks, saveDocChunk, listAllDocChunks, docCount };
+  listDocuments, getDocument, saveDocument, deleteDocument, listDocChunks, saveDocChunk, listAllDocChunks, docCount,
+  logAudit, listAuditLog };
