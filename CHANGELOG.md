@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.7] - 2026-11-21
+
+### Fixed
+- `/api/skills/run` now provides a `print` shim so default skills (which use `print()`) execute correctly.
+- `/api/error-log` read capped to last 100 KB.
+
 ## [1.1.6] - 2026-11-21
 
 ### Fixed

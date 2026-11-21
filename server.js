@@ -296,8 +296,8 @@ const server = http.createServer(async (req, res) => {
       const skill = db.getSkill(body.name);
       if (!skill) return json(res, 404, { ok: false, error: 'skill not found' });
       try {
-        const fn = new Function('args', skill.code || '');
-        const result = fn(body.args || {});
+        const fn = new Function('args', 'print', skill.code || '');
+        const result = fn(body.args || {}, (...a) => console.log(...a));
         return json(res, 200, { ok: true, result: (result === undefined ? null : result) });
       } catch (e) {
         return json(res, 200, { ok: false, error: String(e.message || e) });
@@ -625,8 +625,11 @@ const server = http.createServer(async (req, res) => {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       const fs = require('fs');
       const p = path.join(config.DATA_DIR, 'error.log');
-      try { return json(res, 200, { content: fs.readFileSync(p, 'utf8') }); }
-      catch (e) { return json(res, 200, { content: '' }); }
+      try {
+        const buf = fs.readFileSync(p);
+        const text = buf.length > 100 * 1024 ? buf.slice(-100 * 1024).toString('utf8') : buf.toString('utf8');
+        return json(res, 200, { content: text });
+      } catch (e) { return json(res, 200, { content: '' }); }
     }
     if (url === '/api/search-config' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
