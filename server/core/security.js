@@ -44,7 +44,11 @@ function isValidModelName(name) {
   return typeof name === 'string' && /^[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,199}$/.test(name);
 }
 
-// SSRF guard: only http(s) URLs whose host is not loopback/private/link-local.
+/**
+ * SSRF guard: only http(s) URLs whose host is not loopback/private/link-local.
+ * @param {string} u - URL to check
+ * @returns {boolean} true if safe
+ */
 function isSafeUrl(u) {
   if (typeof u !== 'string' || !u) return false;
   let parsed;
@@ -88,8 +92,14 @@ function isSafeUrl(u) {
   return true;
 }
 
-// Validate that a candidate project root exists and (if an allow-list is
-// configured) is inside it. Returns the resolved path or throws with .status=403.
+/**
+ * Validate that a candidate project root exists and (if an allow-list is
+ * configured) is inside it. Returns the resolved path or throws with .status=403.
+ * @param {string} root - Project root path
+ * @param {string[]} [allowlist] - Allowed base paths
+ * @returns {string} Resolved path
+ * @throws {Error} with .status if invalid
+ */
 function validateProjectRoot(root, allowlist) {
   if (typeof root !== 'string' || !root) throw Object.assign(new Error('root required'), { status: 400 });
   const resolved = path.resolve(root);

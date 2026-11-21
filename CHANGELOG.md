@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.40] - 2026-11-21
+
+### Changed
+- Added JSDoc annotations to security.js functions (isSafeUrl, validateProjectRoot).
+- Enhanced mobile-responsive CSS with additional breakpoints and touch targets.
+
 ## [1.1.39] - 2026-11-21
 
 ### Changed
