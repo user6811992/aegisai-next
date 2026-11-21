@@ -866,9 +866,8 @@ export default function App() {
               }}>Apply</button>
             </div>
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
-              <label>Auth token:</label>
-              <input id="authTokenInput" class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" placeholder="paste AEGISAI_TOKEN" />
-              <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const v = document.getElementById('authTokenInput').value.trim(); if (!v) return; const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: v }) }); const d = await r.json(); alert(d.ok ? 'Logged in (cookie set)' : ('Failed: ' + (d.error || 'unknown'))); }}>Login</button>
+              <span class="text-gray-400">Auth: httpOnly cookie (XSS-safe). Use /api/login to set.</span>
+              <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const v = prompt('Enter auth token:'); if (!v) return; const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: v }) }); const d = await r.json(); alert(d.ok ? 'Logged in (cookie set)' : ('Failed: ' + (d.error || 'unknown'))); }}>Login</button>
               <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { await fetch('/api/logout', { method: 'POST' }); alert('Logged out'); }}>Logout</button>
             </div>
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">

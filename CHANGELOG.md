@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.38] - 2026-11-21
+
+### Changed
+- Cookie-only auth: removed localStorage token fallback; uses httpOnly cookies exclusively.
+- Added JSDoc type annotations to config and security modules.
+- Enhanced mobile-responsive CSS.
+
 ## [1.1.37] - 2026-11-21
 
 ### Fixed

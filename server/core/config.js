@@ -1,5 +1,8 @@
 // server/core/config.js
-// Centralized configuration. Reads env vars; no mutable global state beyond this module.
+/**
+ * Centralized configuration. Reads env vars; no mutable global state beyond this module.
+ * @module config
+ */
 const path = require('path');
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
