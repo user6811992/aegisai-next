@@ -6,14 +6,16 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Set data dir BEFORE requiring server so DB opens in temp dir.
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-e2e-'));
+process.env.AEGISAI_DATA_DIR = tmpDir;
+
 const app = require('../server.js');
 
 let serverInstance;
 let base;
 
 before(async () => {
-  process.env.AEGISAI_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-e2e-'));
-  // re-open db in temp dir (server already opened default; restart not possible, so just use existing)
   serverInstance = app.server;
   await new Promise((resolve) => {
     if (serverInstance.listening) return resolve();
@@ -24,6 +26,7 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => serverInstance.close(resolve));
+  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {}
 });
 
 function req(method, urlPath, body) {

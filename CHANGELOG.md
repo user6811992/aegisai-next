@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.27] - 2026-11-21
+
+### Fixed
+- Onboarding wizard now uses separate pulling/pullMsg state (no UI conflicts).
+- E2E test now sets AEGISAI_DATA_DIR before requiring server (uses temp DB).
+- Chat folder filter now uses text input + datalist (allows creating new folders).
+
 ## [1.1.26] - 2026-11-21
 
 ### Added

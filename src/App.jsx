@@ -55,6 +55,8 @@ export default function App() {
   const [loadingChats, setLoadingChats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingPulling, setOnboardingPulling] = useState(false);
+  const [onboardingPullMsg, setOnboardingPullMsg] = useState('');
   const [abortCtrl, setAbortCtrl] = useState(null);
   const [settingsCfg, setSettingsCfg] = useState({});
   const [integrations, setIntegrations] = useState({});
@@ -357,10 +359,11 @@ export default function App() {
           </div>
           <button class="w-full text-left text-sm bg-blue-600 text-white rounded px-3 py-2 mb-2" onClick={() => { newChat(); setShowSidebar(false); }}>+ New chat</button>
           <input class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-xs text-gray-100 placeholder-gray-400 mb-2" value={chatSearch} onInput={(e) => setChatSearch(e.target.value)} placeholder="Search chats…" />
-          <select class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-xs text-gray-100 mb-2" value={chatFolderFilter} onChange={(e) => setChatFolderFilter(e.target.value)}>
+          <input class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-xs text-gray-100 placeholder-gray-400 mb-2" list="folderList" value={chatFolderFilter} onInput={(e) => setChatFolderFilter(e.target.value)} placeholder="Filter by folder (type to create)…" />
+          <datalist id="folderList">
             <option value="">All folders</option>
-            {[...new Set(chats.map((c) => c.folder).filter(Boolean))].map((f) => <option value={f}>{f}</option>)}
-          </select>
+            {[...new Set(chats.map((c) => c.folder).filter(Boolean))].map((f) => <option value={f} />)}
+          </datalist>
           {loadingChats && chats.length === 0 && [1,2,3].map((i) => (
             <div key={i} class="w-full h-8 bg-gray-700/50 rounded animate-pulse mb-1" />
           ))}
@@ -681,23 +684,23 @@ export default function App() {
             <p class="text-sm text-gray-300 mb-4">No models found. Let's get you set up.</p>
             <div class="space-y-2">
               <button class="w-full bg-blue-600 text-white rounded px-4 py-2 text-sm" onClick={async () => {
-                setPulling(true); setPullMsg('Pulling llama3.2:3b...');
+                setOnboardingPulling(true); setOnboardingPullMsg('Pulling llama3.2:3b...');
                 try {
                   const r = await fetch('/api/pull-model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'llama3.2:3b' }) });
                   const d = await r.json();
-                  setPullMsg(d.message || (d.ok ? 'Done!' : 'Failed'));
+                  setOnboardingPullMsg(d.message || (d.ok ? 'Done!' : 'Failed'));
                   if (d.ok) {
                     const mr = await fetch('/api/models'); const md = await mr.json();
                     const ms = (md.models || []).map((m) => m.name);
                     setModels(ms); if (ms.length) setModel(ms[0]);
                     setShowOnboarding(false);
                   }
-                } catch (e) { setPullMsg('Error: ' + e.message); }
-                finally { setPulling(false); }
-              }} disabled={pulling}>{pulling ? 'Pulling…' : 'Pull llama3.2:3b (recommended)'}</button>
+                } catch (e) { setOnboardingPullMsg('Error: ' + e.message); }
+                finally { setOnboardingPulling(false); }
+              }} disabled={onboardingPulling}>{onboardingPulling ? 'Pulling…' : 'Pull llama3.2:3b (recommended)'}</button>
               <button class="w-full border border-gray-600 text-gray-200 rounded px-4 py-2 text-sm" onClick={() => setShowOnboarding(false)}>Skip — I'll configure later</button>
             </div>
-            {pullMsg && <p class="text-xs text-gray-400 mt-3">{pullMsg}</p>}
+            {onboardingPullMsg && <p class="text-xs text-gray-400 mt-3">{onboardingPullMsg}</p>}
             <p class="text-xs text-gray-500 mt-3">Make sure Ollama is running: <code class="text-gray-300">ollama serve</code></p>
           </div>
         </div>
