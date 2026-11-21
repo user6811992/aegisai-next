@@ -28,18 +28,11 @@ function friendlyError(e) {
   return msg || 'Unknown error';
 }
 
-// Attach auth token from localStorage to every request (needed for token-protected / Docker deployments).
-// Now uses httpOnly cookies (set via /api/login) for XSS-safe auth; localStorage fallback retained for backward compat.
+// Auth via httpOnly cookies (set by /api/login). Cookies sent automatically
+// with credentials: 'include'. No localStorage token (XSS-safe).
 const _origFetch = (typeof window !== 'undefined' && window.fetch) ? window.fetch.bind(window) : null;
 if (_origFetch) {
   window.fetch = (input, init) => {
-    const tok = (typeof localStorage !== 'undefined') ? (localStorage.getItem('aegisai_token') || '') : '';
-    if (tok) {
-      init = init || {};
-      const h = Object.assign({}, (init.headers || {}));
-      if (!h['X-Auth-Token'] && !h['x-auth-token']) h['X-Auth-Token'] = tok;
-      init.headers = h;
-    }
     init = init || {};
     init.credentials = 'include';
     return _origFetch(input, init);
@@ -869,8 +862,10 @@ export default function App() {
               }}>Apply</button>
             </div>
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
-              <label>Auth token (Docker):</label>
-              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" placeholder="paste AEGISAI_TOKEN" defaultValue={localStorage.getItem('aegisai_token') || ''} onChange={(e) => { const v = e.target.value.trim(); if (v) localStorage.setItem('aegisai_token', v); else localStorage.removeItem('aegisai_token'); }} />
+              <label>Auth token:</label>
+              <input id="authTokenInput" class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" placeholder="paste AEGISAI_TOKEN" />
+              <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const v = document.getElementById('authTokenInput').value.trim(); if (!v) return; const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: v }) }); const d = await r.json(); alert(d.ok ? 'Logged in (cookie set)' : ('Failed: ' + (d.error || 'unknown'))); }}>Login</button>
+              <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { await fetch('/api/logout', { method: 'POST' }); alert('Logged out'); }}>Logout</button>
             </div>
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
               <label>Max history (msgs):</label>

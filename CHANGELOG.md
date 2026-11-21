@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.34] - 2026-11-21
+
+### Added
+- Prometheus metrics: `/metrics` endpoint with counters and histograms.
+- Cookie-only auth: removed localStorage fallback; uses httpOnly cookies exclusively.
+- Mobile-responsive CSS: media queries, touch-friendly targets, safe-area insets.
+- Dark/light theme toggle: ☀️/🌙 button with CSS variable overrides.
+
 ## [1.1.33] - 2026-11-21
 
 ### Fixed

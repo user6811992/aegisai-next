@@ -138,6 +138,12 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/health' && req.method === 'GET') {
       return json(res, 200, { ok: true, version: VERSION, uptime: process.uptime() });
     }
+    if (url === '/metrics' && req.method === 'GET') {
+      const m = require('./server/core/metrics');
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+      return res.end(m.render());
+    }
     if (url === '/api/plugins' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, { plugins: require('./server/core/plugins').listPlugins() });
