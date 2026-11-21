@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.50] - 2026-11-21
+
+### Added
+- LAN mode: configurable backend URL in Settings for mobile → PC connectivity.
+- Offline indicator: shows ⚠ Offline in header when navigator.onLine is false.
+- Enhanced mobile-responsive CSS with comprehensive breakpoints.
+
 ## [1.1.49] - 2026-11-21
 
 ### Changed

@@ -35,6 +35,11 @@ if (_origFetch) {
   window.fetch = (input, init) => {
     init = init || {};
     init.credentials = 'include';
+    // LAN mode: prefix relative API calls with configured backend URL
+    const backendUrl = (typeof localStorage !== 'undefined') ? (localStorage.getItem('aegisai_backend_url') || '') : '';
+    if (backendUrl && typeof input === 'string' && input.startsWith('/')) {
+      input = backendUrl.replace(/\/$/, '') + input;
+    }
     return _origFetch(input, init);
   };
 }
@@ -391,6 +396,7 @@ export default function App() {
       <header class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center gap-3">
         <h1 class="font-semibold text-lg text-white">AegisAI (next)</h1>
         <span class="text-xs text-gray-400">v{version}</span>
+        {!navigator.onLine && <span class="text-xs text-yellow-400 ml-2">⚠ Offline</span>}
         <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
         <nav class="ml-4 flex gap-2">
           <button class="text-sm px-2 py-1 rounded text-gray-300 hover:bg-gray-700" onClick={() => { setShowSidebar((s) => !s); loadChats(); }}>Chats</button>
@@ -871,6 +877,10 @@ export default function App() {
               <span class="text-gray-400">Auth: httpOnly cookie (XSS-safe). Use /api/login to set.</span>
               <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const v = prompt('Enter auth token:'); if (!v) return; const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: v }) }); const d = await r.json(); alert(d.ok ? 'Logged in (cookie set)' : ('Failed: ' + (d.error || 'unknown'))); }}>Login</button>
               <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { await fetch('/api/logout', { method: 'POST' }); alert('Logged out'); }}>Logout</button>
+            </div>
+            <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
+              <label>Backend URL (LAN):</label>
+              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" placeholder="http://192.168.1.100:8080" defaultValue={localStorage.getItem('aegisai_backend_url') || ''} onChange={(e) => { const v = e.target.value.trim(); if (v) localStorage.setItem('aegisai_backend_url', v); else localStorage.removeItem('aegisai_backend_url'); }} />
             </div>
             <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
               <label>Max history (msgs):</label>
