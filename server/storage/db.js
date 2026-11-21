@@ -112,6 +112,10 @@ function open(dbPath) {
     function v2() {
       try { db.exec('ALTER TABLE chats ADD COLUMN folder TEXT'); } catch (e) { /* already exists */ }
     },
+    // v3: add pinned column to chats
+    function v3() {
+      try { db.exec('ALTER TABLE chats ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0'); } catch (e) { /* already exists */ }
+    },
   ];
   for (let i = currentVersion; i < migrations.length; i++) {
     migrations[i]();
@@ -135,9 +139,9 @@ function run(sql, params) { db.prepare(sql).run(...(params || [])); }
 function rowToChat(r) {
   let messages = [];
   try { messages = JSON.parse(r.messages || '[]'); } catch (e) { messages = []; }
-  return { id: r.id, title: r.title, updated: r.updated, parent_id: r.parent_id, branch_from: r.branch_from, folder: r.folder || null, messages };
+  return { id: r.id, title: r.title, updated: r.updated, parent_id: r.parent_id, branch_from: r.branch_from, folder: r.folder || null, pinned: !!r.pinned, messages };
 }
-function listChats() { return all('SELECT id, title, updated, parent_id, branch_from, folder FROM chats ORDER BY updated DESC').map(rowToChat); }
+function listChats() { return all('SELECT id, title, updated, parent_id, branch_from, folder, pinned FROM chats ORDER BY pinned DESC, updated DESC').map(rowToChat); }
 function getChat(id) { const row = one('SELECT * FROM chats WHERE id = ?', [id]); return row ? rowToChat(row) : null; }
 function saveChat(chat) {
   const id = chat.id || ('chat_' + Date.now());
@@ -147,11 +151,12 @@ function saveChat(chat) {
   const parentId = chat.parent_id || null;
   const branchFrom = (chat.branch_from === undefined) ? null : chat.branch_from;
   const folder = (chat.folder === undefined) ? null : chat.folder;
+  const pinned = (chat.pinned === undefined) ? null : (chat.pinned ? 1 : 0);
   const existing = one('SELECT id FROM chats WHERE id = ?', [id]);
   if (existing) {
-    run('UPDATE chats SET title=?, updated=?, messages=?, parent_id=?, branch_from=?, folder=? WHERE id=?', [title, updated, messages, parentId, branchFrom, folder, id]);
+    run('UPDATE chats SET title=?, updated=?, messages=?, parent_id=?, branch_from=?, folder=?, pinned=COALESCE(?, pinned) WHERE id=?', [title, updated, messages, parentId, branchFrom, folder, pinned, id]);
   } else {
-    run('INSERT INTO chats (id, title, updated, parent_id, branch_from, folder, messages) VALUES (?,?,?,?,?,?,?)', [id, title, updated, parentId, branchFrom, folder, messages]);
+    run('INSERT INTO chats (id, title, updated, parent_id, branch_from, folder, pinned, messages) VALUES (?,?,?,?,?,?,?,?)', [id, title, updated, parentId, branchFrom, folder, pinned || 0, messages]);
   }
   return id;
 }

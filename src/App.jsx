@@ -376,9 +376,12 @@ export default function App() {
             <div key={i} class="w-full h-8 bg-gray-700/50 rounded animate-pulse mb-1" />
           ))}
           {chats.filter((c) => (!chatFolderFilter || (c.folder || '') === chatFolderFilter) && (!chatSearch || (c.title || '').toLowerCase().includes(chatSearch.toLowerCase()) || (c.snippet || '').toLowerCase().includes(chatSearch.toLowerCase()))).map((c) => (
-            <button key={c.id} class={`w-full text-left text-xs rounded px-3 py-2 truncate ${chatId === c.id ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={async () => { const r = await fetch('/api/chats/' + c.id); const d = await r.json(); setMessages(d.messages || []); setChatId(c.id); setShowSidebar(false); loadChats(); }}>
-              {c.title || 'Untitled'}
-            </button>
+            <div key={c.id} class="flex items-center gap-1 mb-1">
+              <button class={`flex-1 text-left text-xs rounded px-3 py-2 truncate ${chatId === c.id ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'} ${c.pinned ? 'border-l-2 border-blue-500' : ''}`} onClick={async () => { const r = await fetch('/api/chats/' + c.id); const d = await r.json(); setMessages(d.messages || []); setChatId(c.id); setShowSidebar(false); loadChats(); }}>
+                {c.pinned ? '📌 ' : ''}{c.title || 'Untitled'}
+              </button>
+              <button class="text-xs text-gray-500 hover:text-yellow-400 px-1" onClick={async (e) => { e.stopPropagation(); await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id, title: c.title, messages: (await (await fetch('/api/chats/' + c.id)).json()).messages, pinned: !c.pinned }) }); loadChats(); }} title={c.pinned ? 'Unpin' : 'Pin'}>{c.pinned ? '📌' : '📍'}</button>
+            </div>
           ))}
         </div>
       )}

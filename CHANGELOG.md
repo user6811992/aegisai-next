@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.43] - 2026-11-21
+
+### Added
+- Pin chat: pin/unpin chats (pinned shown first, with 📌 indicator). Fixed JSX fragment issue.
+
+## [1.1.42] - 2026-11-21
+
+### Added
+- Pin chat: pin/unpin chats (pinned shown first, with 📌 indicator).
+
 ## [1.1.41] - 2026-11-21
 
 ### Added
