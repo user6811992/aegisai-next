@@ -205,7 +205,7 @@ const server = http.createServer(async (req, res) => {
           const q = (lastUser && lastUser.content) || '';
           if (q) {
             const url = (backends.getUrl() || 'http://127.0.0.1:11434') + '/api/embeddings';
-            const er = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: body.embedModel || 'nomic-embed-text', prompt: q }) });
+            const er = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: body.embedModel || 'nomic-embed-text', prompt: q }), signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined });
             const ed = await er.json();
             const qEmb = ed.embedding;
             if (qEmb) {

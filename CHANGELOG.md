@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.17] - 2026-11-21
+
+### Fixed
+- Added AbortSignal.timeout to embedding fetch in RAG memory injection.
+
 ## [1.1.16] - 2026-11-21
 
 ### Fixed
