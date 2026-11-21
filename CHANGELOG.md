@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.25] - 2026-11-21
+
+### Fixed
+- `send()` now checks `res.ok` before reading stream; shows friendly error on failure.
+- Chat search now searches message content (via snippet from first user message).
+- Voice input alert now suggests Chrome/Edge for Firefox users.
+
 ## [1.1.24] - 2026-11-21
 
 ### Added

@@ -146,6 +146,11 @@ export default function App() {
         body: JSON.stringify({ model, messages: next, includeCoding: cfg.includeCoding !== false, includeRe: cfg.includeRe !== false, cleanRoom, includeDocuments }),
         signal: ctrl.signal,
       });
+      if (!res.ok) {
+        assistant.content = 'Error: ' + friendlyError(new Error('HTTP ' + res.status));
+        setMessages([...next, { ...assistant }]);
+        return;
+      }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -352,7 +357,7 @@ export default function App() {
           {loadingChats && chats.length === 0 && [1,2,3].map((i) => (
             <div key={i} class="w-full h-8 bg-gray-700/50 rounded animate-pulse mb-1" />
           ))}
-          {chats.filter((c) => !chatSearch || (c.title || '').toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
+          {chats.filter((c) => !chatSearch || (c.title || '').toLowerCase().includes(chatSearch.toLowerCase()) || (c.snippet || '').toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
             <button key={c.id} class={`w-full text-left text-xs rounded px-3 py-2 truncate ${chatId === c.id ? 'bg-gray-700 text-white' : 'text-gray-300 hover:bg-gray-700'}`} onClick={async () => { const r = await fetch('/api/chats/' + c.id); const d = await r.json(); setMessages(d.messages || []); setChatId(c.id); setShowSidebar(false); loadChats(); }}>
               {c.title || 'Untitled'}
             </button>
@@ -472,7 +477,7 @@ export default function App() {
               </label>
               <button class="bg-gray-700 text-gray-200 rounded px-3 py-2 text-sm hover:bg-gray-600" title="Voice input" onClick={() => {
                 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SR) { alert('Speech recognition not supported in this browser'); return; }
+                if (!SR) { alert('Voice input requires Chrome or Edge (SpeechRecognition not available in this browser).'); return; }
                 const rec = new SR();
                 rec.lang = 'en-US';
                 rec.interimResults = false;

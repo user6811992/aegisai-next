@@ -458,7 +458,12 @@ const server = http.createServer(async (req, res) => {
     // ---------- Chats ----------
     if (url === '/api/chats' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
-      return json(res, 200, { chats: db.listChats() });
+      const chats = db.listChats().map((c) => {
+        const full = db.getChat(c.id);
+        const firstUser = (full && full.messages || []).find((m) => m.role === 'user');
+        return { ...c, snippet: firstUser ? String(firstUser.content || '').slice(0, 80) : '' };
+      });
+      return json(res, 200, { chats });
     }
     if (url.startsWith('/api/chats/') && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
