@@ -20,6 +20,10 @@ try {
 
 let db = null;
 
+/**
+ * Open the SQLite database and run migrations.
+ * @param {string} dbPath - Path to the database file
+ */
 function open(dbPath) {
   if (!backend) throw new Error('No SQLite backend available (install better-sqlite3 or use Node 22.5+)');
   if (backend === 'better') {

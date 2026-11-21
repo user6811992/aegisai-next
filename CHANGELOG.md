@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.53] - 2026-11-21
+
+### Changed
+- Enhanced mobile-responsive sidebar (overlay with backdrop).
+- Added JSDoc to db.js open() function.
+
 ## [1.1.52] - 2026-11-21
 
 ### Changed
