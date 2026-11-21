@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.41] - 2026-11-21
+
+### Added
+- Copy message button (📋) on all messages.
+- Enhanced mobile-responsive CSS with more breakpoints and touch targets.
+- JSDoc annotations on validateProjectRoot, isSafeUrl, downloadToFile.
+
 ## [1.1.40] - 2026-11-21
 
 ### Changed

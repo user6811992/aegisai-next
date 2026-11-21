@@ -124,8 +124,14 @@ function safePath(projectRoot, rel) {
   return resolved;
 }
 
-// Download a URL to disk, following up to 5 redirects (http/https only).
-// Rejects non-200 responses instead of writing an error page to disk.
+/**
+ * Download a URL to disk, following up to 5 redirects (http/https only).
+ * Rejects non-200 responses instead of writing an error page to disk.
+ * @param {string} url - URL to download
+ * @param {string} dest - Destination file path
+ * @param {object} [opts] - Options (maxRedirects, headers)
+ * @returns {Promise<void>}
+ */
 function downloadToFile(url, dest, opts) {
   const http = require('http');
   const https = require('https');

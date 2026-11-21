@@ -431,6 +431,7 @@ export default function App() {
                     {m.role === 'user' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { setInput(m.content || ''); setMessages(messages.slice(0, i)); }}>✏️</button>}
                     {m.role === 'assistant' && i > 0 && messages[i-1]?.role === 'user' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const prev = messages[i-1]; const trimmed = messages.slice(0, i); setMessages(trimmed); setInput(prev.content || ''); setTimeout(() => send(prev.content || ''), 50); }} title="Regenerate">🔄</button>}
                     {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
+                    <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { navigator.clipboard.writeText(m.content || ''); }} title="Copy">📋</button>
                   </div>
                 </div>
                 {m.thinking && (
