@@ -259,7 +259,7 @@ const server = http.createServer(async (req, res) => {
       const model = body.model || 'llama3.2:3b';
       const prompt = 'Extract durable facts about the user or project from this conversation. Return a JSON array of short strings. Only include non-obvious, reusable facts.\\n\\nConversation:\\n' + text + '\\n\\nJSON array:';
       try {
-        const r = await backends.backendChat({ model, messages: [{ role: 'user', content: prompt }], stream: false }, () => {});
+        const r = await backends.backendChat({ model, messages: [{ role: 'user', content: prompt }], stream: false }, () => {}, (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(60000) : undefined);
         const d = r && r.data ? r.data : r;
         const content = (d && d.message && d.message.content) || '';
         let facts = [];
@@ -295,6 +295,7 @@ const server = http.createServer(async (req, res) => {
       let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
       const skill = db.getSkill(body.name);
       if (!skill) return json(res, 404, { ok: false, error: 'skill not found' });
+      if (skill.code && skill.code.length > 100000) return json(res, 400, { ok: false, error: 'skill code too large' });
       try {
         const fn = new Function('args', 'print', skill.code || '');
         const result = fn(body.args || {}, (...a) => console.log(...a));
@@ -591,7 +592,7 @@ const server = http.createServer(async (req, res) => {
       const model = body.model || 'llama3.2:3b';
       const prompt = 'Answer the following question based ONLY on the provided text. Be concise.\\n\\nQuestion: ' + (body.question || '') + '\\n\\nText:\\n' + text;
       try {
-        const r = await backends.backendChat({ model, messages: [{ role: 'user', content: prompt }], stream: false }, () => {});
+        const r = await backends.backendChat({ model, messages: [{ role: 'user', content: prompt }], stream: false }, () => {}, (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(60000) : undefined);
         const d = r && r.data ? r.data : r;
         const answer = (d && d.message && d.message.content) || '';
         return json(res, 200, { ok: true, answer });

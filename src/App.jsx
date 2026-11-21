@@ -67,16 +67,19 @@ export default function App() {
   const newChat = () => { setMessages([]); setChatId(null); setBranches([]); setToolLog([]); };
 
   useEffect(() => {
-    fetch('/api/version').then((r) => r.json()).then((d) => setVersion(d.version)).catch(() => setVersion('?'));
-    fetch('/api/models').then((r) => r.json()).then((d) => {
+    let cancelled = false;
+    const safe = (fn) => { if (!cancelled) fn(); };
+    fetch('/api/version').then((r) => r.json()).then((d) => safe(() => setVersion(d.version))).catch(() => safe(() => setVersion('?')));
+    fetch('/api/models').then((r) => r.json()).then((d) => safe(() => {
       const ms = (d.models || []).map((m) => m.name);
       setModels(ms);
       if (ms.length && !model) setModel(ms[0]);
-    }).catch(() => {});
-    fetch('/api/integrations/status').then((r) => r.json()).then((d) => { fetch('/api/backend').then((r) => r.json()).then((b) => setIntegrations({ ...d, _backend: b })).catch(() => setIntegrations(d)); }).catch(() => {});
+    })).catch(() => {});
+    fetch('/api/integrations/status').then((r) => r.json()).then((d) => { fetch('/api/backend').then((r) => r.json()).then((b) => safe(() => setIntegrations({ ...d, _backend: b }))).catch(() => safe(() => setIntegrations(d))); }).catch(() => {});
     refreshMemory();
     refreshSkills();
     loadChats();
+    return () => { cancelled = true; };
   }, []);
 
   async function send() {
@@ -123,6 +126,10 @@ export default function App() {
             assistant.content += '\n🔧 ' + ev.name + '\n';
           } else if (ev.type === 'done' && ev.final !== undefined) {
             finalData = ev;
+          } else if (ev.type === 'tool_result') {
+            if (toolLogAcc.length) {
+              toolLogAcc[toolLogAcc.length - 1].resultPreview = ev.preview || toolLogAcc[toolLogAcc.length - 1].resultPreview;
+            }
           } else if (ev.type === 'error') {
             finalData = { error: ev.error, final: '', toolLog: [] };
           }

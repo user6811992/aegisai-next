@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.9] - 2026-11-21
+
+### Fixed
+- `App.jsx` `send()` now handles `tool_result` SSE events (surfaces tool results in UI).
+- `App.jsx` `useEffect` now cleans up on unmount (prevents stale state updates).
+- `/api/skills/run` rejects skill code larger than 100 KB.
+- `/api/memory/extract` and `/api/squeeze` now pass a 60s abort signal to the backend.
+
 ## [1.1.8] - 2026-11-21
 
 ### Fixed
