@@ -138,6 +138,10 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/health' && req.method === 'GET') {
       return json(res, 200, { ok: true, version: VERSION, uptime: process.uptime() });
     }
+    if (url === '/api/plugins' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { plugins: require('./server/core/plugins').listPlugins() });
+    }
     if (url === '/api/openapi.json' && req.method === 'GET') {
       const fs = require('fs');
       const path = require('path');
@@ -1155,6 +1159,7 @@ async function start() {
   listenServer.listen(PORT, HOST, () => {
     const proto = (certPath && keyPath) ? 'https' : 'http';
     console.log(`AegisAI (next) v${VERSION} listening on ${proto}://${HOST}:${PORT}`);
+    try { require('./server/core/plugins').loadPlugins({ app: null, server: listenServer, db, settings, config }); } catch (e) { console.error('Plugin load failed:', e.message); }
     // Scheduled backups
     const backupInterval = parseInt(process.env.AEGISAI_BACKUP_INTERVAL || '0', 10);
     if (backupInterval > 0) {

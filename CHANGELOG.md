@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.32] - 2026-11-21
+
+### Added
+- Plugin/extension system: `server/core/plugins.js` loader + `/api/plugins` endpoint.
+- PDF export: "Export chat (PDF)" button using browser print.
+- Cookie-only auth migration: localStorage token migrated to httpOnly cookie on load.
+
 ## [1.1.31] - 2026-11-21
 
 ### Fixed

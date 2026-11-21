@@ -29,6 +29,7 @@ function friendlyError(e) {
 }
 
 // Attach auth token from localStorage to every request (needed for token-protected / Docker deployments).
+// Now uses httpOnly cookies (set via /api/login) for XSS-safe auth; localStorage fallback retained for backward compat.
 const _origFetch = (typeof window !== 'undefined' && window.fetch) ? window.fetch.bind(window) : null;
 if (_origFetch) {
   window.fetch = (input, init) => {
@@ -56,6 +57,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [loadingChats, setLoadingChats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('aegisai_theme') || 'dark');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingPulling, setOnboardingPulling] = useState(false);
   const [onboardingPullMsg, setOnboardingPullMsg] = useState('');
@@ -112,6 +114,14 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     const safe = (fn) => { if (!cancelled) fn(); };
+    // Migrate localStorage token to httpOnly cookie (one-time).
+    const storedTok = (typeof localStorage !== 'undefined') ? (localStorage.getItem('aegisai_token') || '') : '';
+    if (storedTok) {
+      fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: storedTok }) })
+        .then((r) => r.json())
+        .then((d) => { if (d.ok) localStorage.removeItem('aegisai_token'); })
+        .catch(() => {});
+    }
     fetch('/api/version').then((r) => r.json()).then((d) => safe(() => setVersion(d.version))).catch(() => safe(() => setVersion('?')));
     fetch('/api/models').then((r) => r.json()).then((d) => safe(() => {
       const ms = (d.models || []).map((m) => m.name);
@@ -133,6 +143,11 @@ export default function App() {
     if (!showSettings) return;
     fetch('/api/settings').then((r) => r.json()).then((d) => setSettingsCfg(d || {})).catch(() => {});
   }, [showSettings]);
+
+  useEffect(() => {
+    document.body.classList.toggle('light-theme', theme === 'light');
+    localStorage.setItem('aegisai_theme', theme);
+  }, [theme]);
 
   async function send(textOverride) {
     const text = (textOverride !== undefined ? textOverride : input).trim();
@@ -385,6 +400,7 @@ export default function App() {
       <header class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center gap-3">
         <h1 class="font-semibold text-lg text-white">AegisAI (next)</h1>
         <span class="text-xs text-gray-400">v{version}</span>
+        <button class="border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
         <nav class="ml-4 flex gap-2">
           <button class="text-sm px-2 py-1 rounded text-gray-300 hover:bg-gray-700" onClick={() => { setShowSidebar((s) => !s); loadChats(); }}>Chats</button>
           {['chat', 'memory', 'skills', 'are', 'models', 'documents', 'users', 'tasks'].map((t) => (
@@ -876,6 +892,7 @@ export default function App() {
             <div class="mt-3 flex gap-2">
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportChatMd}>Export chat (MD)</button>
+              <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={() => window.print()}>Export chat (PDF)</button>
               <label class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer">
                 Import backup
                 <input type="file" accept="application/json" class="hidden" onChange={async (e) => { const f = e.target.files[0]; if (!f) return; const text = await f.text(); const data = JSON.parse(text); const r = await fetch('/api/backup/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const d = await r.json(); alert(d.ok ? 'Imported' : ('Failed: ' + (d.error || 'unknown'))); refreshMemory(); refreshSkills(); }} />
