@@ -118,7 +118,13 @@ function validateProjectRoot(root, allowlist) {
   return resolved;
 }
 
-// Resolve a relative path inside a project root, blocking traversal.
+/**
+ * Resolve a relative path inside a project root, blocking traversal.
+ * @param {string} projectRoot - Project root directory
+ * @param {string} [rel='.'] - Relative path
+ * @returns {string} Resolved absolute path
+ * @throws {Error} if path escapes project root
+ */
 function safePath(projectRoot, rel) {
   if (!projectRoot) throw new Error('no project root set');
   const resolved = path.resolve(projectRoot, rel || '.');

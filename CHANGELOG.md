@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.49] - 2026-11-21
+
+### Changed
+- Enhanced mobile-responsive CSS with comprehensive breakpoints.
+- Added JSDoc annotations to security.js (safePath, downloadToFile).
+
 ## [1.1.48] - 2026-11-21
 
 ### Changed
