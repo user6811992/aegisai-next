@@ -101,6 +101,8 @@ function checkAuth(req) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    const rl = require('./server/core/ratelimit');
+    if (!rl.check(req, res)) return;
     const url = req.url.split('?')[0];
     if (url === '/api/versions' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }

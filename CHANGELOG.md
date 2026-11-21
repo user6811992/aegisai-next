@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.13] - 2026-11-21
+
+### Added
+- Optional, opt-in rate limiter (`AEGISAI_RATE_LIMIT`, default 0 = off). Loopback always exempt; stricter limits on auth/expensive endpoints; `Retry-After` + `X-RateLimit-*` headers.
+
 ## [1.1.12] - 2026-11-21
 
 ### Fixed

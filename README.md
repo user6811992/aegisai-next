@@ -89,6 +89,8 @@ Or use the **Models** tab in the web UI.
 |---|---|---|
 | `PORT` / `HOST` | Bind address | 127.0.0.1:8080 |
 | `LOCALAI_TOKEN` / `AEGISAI_TOKEN` | Auth token (open mode if unset) | (none) |
+| `AEGISAI_RATE_LIMIT` | Rate limit (req/min per IP; 0 = off) | 0 |
+| `AEGISAI_RATE_WINDOW` | Rate limit window (seconds) | 60 |
 | `AEGISAI_DATA_DIR` | Data directory | ./data |
 | `AEGISAI_PROJECT_ROOT_ALLOWLIST` | Allow-list for agent project roots | (none) |
 | `AEGISAI_TOOL_BUDGET` | Agent tool budget | 64 |
@@ -140,7 +142,7 @@ Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 .\installer\build.ps1
 ```
 
-Output: `installer/output/AegisAI-Next-Setup-1.1.12.exe`
+Output: `installer/output/AegisAI-Next-Setup-1.1.13.exe`
 
 ## Installer (macOS)
 
