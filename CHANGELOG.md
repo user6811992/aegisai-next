@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.22] - 2026-11-21
+
+### Added
+- Token/cost display per message (prompt/generated tokens shown).
+- Message editing (✏️ on user messages) and regeneration (🔄 on assistant messages).
+- Conversation export as Markdown (Export chat (MD) button).
+- CI/CD: GitHub Actions workflow running tests + build on push/PR.
+- Image input foundation (base64 upload path).
+
 ## [1.1.21] - 2026-11-21
 
 ### Added

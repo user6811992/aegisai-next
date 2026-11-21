@@ -93,11 +93,12 @@ export default function App() {
     fetch('/api/settings').then((r) => r.json()).then((d) => setSettingsCfg(d || {})).catch(() => {});
   }, [showSettings]);
 
-  async function send() {
-    if (!input.trim() || busy) return;
-    setInputHistory((h) => [...h, input]);
+  async function send(textOverride) {
+    const text = (textOverride !== undefined ? textOverride : input).trim();
+    if (!text || busy) return;
+    setInputHistory((h) => [...h, text]);
     setHistoryIdx(-1);
-    const userMsg = { role: 'user', content: input };
+    const userMsg = { role: 'user', content: text };
     const next = [...messages, userMsg];
     setMessages(next);
     setInput('');
@@ -175,6 +176,7 @@ export default function App() {
           }
         }
         assistant.citations = [...new Set(cites)].slice(0, 5);
+        if (finalData.tokenStats) assistant.tokenStats = finalData.tokenStats;
       }
       setMessages([...next, { ...assistant }]);
       // auto-save
@@ -287,6 +289,24 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  function exportChatMd() {
+    if (!messages.length) { alert('No chat to export'); return; }
+    const lines = ['# Chat Export', ''];
+    for (const m of messages) {
+      lines.push('## ' + (m.role === 'user' ? 'User' : 'Assistant'));
+      lines.push('');
+      lines.push(m.content || '');
+      lines.push('');
+      if (m.tokenStats) lines.push('_Tokens: ' + m.tokenStats.prompt + ' in / ' + m.tokenStats.generated + ' out_');
+      lines.push('');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'chat-export.md'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const card = 'bg-gray-800 border border-gray-700 rounded-lg';
 
   return (
@@ -348,8 +368,12 @@ export default function App() {
             {messages.map((m, i) => (
               <div key={i} class={`rounded-lg p-3 ${m.role === 'user' ? 'bg-blue-900/40 ml-8 border border-blue-800' : 'bg-gray-800 border border-gray-700'}`}>
                 <div class="text-xs text-gray-400 mb-1 flex justify-between">
-                  <span>{m.role}</span>
-                  {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
+                  <span>{m.role}{m.role === 'assistant' && m.tokenStats ? ` · ${m.tokenStats.prompt}↑ ${m.tokenStats.generated}↓ tok` : ''}</span>
+                  <div class="flex gap-1">
+                    {m.role === 'user' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { setInput(m.content || ''); setMessages(messages.slice(0, i)); }}>✏️</button>}
+                    {m.role === 'assistant' && i > 0 && messages[i-1]?.role === 'user' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const prev = messages[i-1]; const trimmed = messages.slice(0, i); setMessages(trimmed); setInput(prev.content || ''); setTimeout(() => send(prev.content || ''), 50); }} title="Regenerate">🔄</button>}
+                    {m.role === 'assistant' && <button class="text-xs text-gray-400 hover:text-gray-200" onClick={() => { const u = new SpeechSynthesisUtterance(m.content); window.speechSynthesis.speak(u); }}>🔊</button>}
+                  </div>
                 </div>
                 {m.thinking && (
                   <details class="mb-2">
@@ -677,6 +701,7 @@ export default function App() {
             </div>
             <div class="mt-3 flex gap-2">
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportBackup}>Export backup</button>
+              <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={exportChatMd}>Export chat (MD)</button>
               <label class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer">
                 Import backup
                 <input type="file" accept="application/json" class="hidden" onChange={async (e) => { const f = e.target.files[0]; if (!f) return; const text = await f.text(); const data = JSON.parse(text); const r = await fetch('/api/backup/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const d = await r.json(); alert(d.ok ? 'Imported' : ('Failed: ' + (d.error || 'unknown'))); refreshMemory(); refreshSkills(); }} />

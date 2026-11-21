@@ -304,7 +304,7 @@ const server = http.createServer(async (req, res) => {
           onEvent: (e) => send(e),
           signal,
         });
-        send({ type: 'done', ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog });
+        send({ type: 'done', ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog, tokenStats: result.final.tokenStats || null });
       } catch (e) {
         send({ type: 'error', ok: false, error: String(e && e.message ? e.message : e) });
         send({ type: 'done', ok: false, final: '', thinking: '', toolLog: [] });

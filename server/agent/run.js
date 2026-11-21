@@ -129,7 +129,7 @@ async function runAgent(opts) {
 
     if (!toolCalls || (Array.isArray(toolCalls) && toolCalls.length === 0)) {
       const finalText = msg.content || '';
-      return { final: { type: 'done', final: finalText, thinking, toolLog }, toolLog };
+      return { final: { type: 'done', final: finalText, thinking, toolLog, tokenStats: { prompt: data.prompt_eval_count || 0, generated: data.eval_count || 0 } }, toolLog };
     }
 
     // append assistant message with tool_calls
