@@ -3,6 +3,21 @@ import { useState, useEffect } from 'preact/hooks';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
+// Attach auth token from localStorage to every request (needed for token-protected / Docker deployments).
+const _origFetch = (typeof window !== 'undefined' && window.fetch) ? window.fetch.bind(window) : null;
+if (_origFetch) {
+  window.fetch = (input, init) => {
+    const tok = (typeof localStorage !== 'undefined') ? (localStorage.getItem('aegisai_token') || '') : '';
+    if (tok) {
+      init = init || {};
+      const h = Object.assign({}, (init.headers || {}));
+      if (!h['X-Auth-Token'] && !h['x-auth-token']) h['X-Auth-Token'] = tok;
+      init.headers = h;
+    }
+    return _origFetch(input, init);
+  };
+}
+
 export default function App() {
   const [version, setVersion] = useState('...');
   const [models, setModels] = useState([]);
@@ -575,6 +590,10 @@ export default function App() {
                 const b = await (await fetch('/api/backend')).json();
                 setIntegrations({ ...st, _backend: b });
               }}>Apply</button>
+            </div>
+            <div class="mt-2 flex items-center gap-2 text-xs text-gray-300">
+              <label>Auth token (Docker):</label>
+              <input class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100" placeholder="paste AEGISAI_TOKEN" defaultValue={localStorage.getItem('aegisai_token') || ''} onChange={(e) => { const v = e.target.value.trim(); if (v) localStorage.setItem('aegisai_token', v); else localStorage.removeItem('aegisai_token'); }} />
             </div>
             <div class="mt-3 flex gap-2">
               <button class="border border-gray-600 rounded px-3 py-1 text-sm text-gray-200 hover:bg-gray-700" onClick={async () => { const r = await fetch('/api/versions'); const d = await r.json(); alert('AegisAI: ' + d.aegisai + '\nNode: ' + d.node + '\nOllama: ' + d.ollama + '\nREA: ' + (d.rea && d.rea.toolCount) + ' tools'); }}>Check versions</button>

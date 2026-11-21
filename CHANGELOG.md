@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5] - 2026-11-21
+
+### Fixed
+- Frontend now attaches `AEGISAI_TOKEN` from localStorage to all API requests (enables Docker/token-protected deployments).
+- Settings modal gains an "Auth token" input.
+- `awesome-re` refresh now follows HTTP redirects.
+
 ## [1.1.4] - 2026-11-21
 
 ### Fixed

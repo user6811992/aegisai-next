@@ -25,11 +25,21 @@ async function refresh() {
     const buf = await new Promise((resolve, reject) => {
       const headers = { 'User-Agent': 'AegisAI' };
       if (process.env.GITHUB_TOKEN) headers['Authorization'] = 'token ' + process.env.GITHUB_TOKEN;
-      https.get(ARE_DATA_URL, { headers }, (r) => {
-        let b = '';
-        r.on('data', (c) => { if (b.length > 50 * 1024 * 1024) { reject(new Error('too large')); r.destroy(); return; } b += c; });
-        r.on('end', () => resolve(b));
-      }).on('error', reject);
+      let hops = 0;
+      const doGet = (u) => {
+        https.get(u, { headers }, (r) => {
+          if ([301,302,303,307,308].includes(r.statusCode) && r.headers.location && hops < 5) {
+            hops += 1; r.resume();
+            let next; try { next = new URL(r.headers.location, u).toString(); } catch (e) { return reject(e); }
+            return doGet(next);
+          }
+          if (r.statusCode !== 200) { r.resume(); return reject(new Error('HTTP ' + r.statusCode)); }
+          let b = '';
+          r.on('data', (c) => { if (b.length > 50 * 1024 * 1024) { reject(new Error('too large')); r.destroy(); return; } b += c; });
+          r.on('end', () => resolve(b));
+        }).on('error', reject);
+      };
+      doGet(ARE_DATA_URL);
     });
     data = JSON.parse(buf);
     fs.mkdirSync(DATA_DIR, { recursive: true });
