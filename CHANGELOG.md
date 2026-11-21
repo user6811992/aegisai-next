@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.11] - 2026-11-21
+
+### Fixed
+- Removed unused `server/tools/registry.js` skeleton.
+- `App.jsx` `send()` now adds a fallback when the stream ends without a `done` event.
+
 ## [1.1.10] - 2026-11-21
 
 ### Fixed

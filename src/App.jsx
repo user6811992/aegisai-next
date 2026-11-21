@@ -136,6 +136,9 @@ export default function App() {
           setMessages([...next, { ...assistant }]);
         }
       }
+      if (!finalData) {
+        finalData = { final: assistant.content ? '' : '[No response received from model.]', thinking: '', toolLog: toolLogAcc };
+      }
       if (finalData) {
         let finalText = finalData.final || '';
         if (!finalText && !(finalData.toolLog && finalData.toolLog.length) && !assistant.content.trim()) {
