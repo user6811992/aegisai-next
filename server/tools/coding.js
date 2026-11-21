@@ -18,12 +18,16 @@ async function execCodingTool(name, args, projectRoot) {
   switch (name) {
     case 'list_files': {
       const dir = security.safePath(projectRoot, a.path || '.');
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+      catch (e) { return { ok: false, output: 'cannot read directory: ' + (e.message || e) }; }
       const out = entries.map((e) => (e.isDirectory() ? e.name + '/' : e.name)).join('\n');
       return { ok: true, output: out || '(empty)' };
     }
     case 'read_file': {
       const p = security.safePath(projectRoot, a.path);
+      const st = fs.statSync(p);
+      if (st.size > 2 * 1024 * 1024) return { ok: false, output: 'file too large (>2MB)' };
       const content = fs.readFileSync(p, 'utf8');
       const max = a.maxBytes || 200000;
       return { ok: true, output: content.slice(0, max) };
@@ -36,8 +40,10 @@ async function execCodingTool(name, args, projectRoot) {
     }
     case 'delete_file': {
       const p = security.safePath(projectRoot, a.path);
-      if (fs.statSync(p).isDirectory()) fs.rmSync(p, { recursive: true, force: true });
-      else fs.unlinkSync(p);
+      try {
+        if (fs.statSync(p).isDirectory()) fs.rmSync(p, { recursive: true, force: true });
+        else fs.unlinkSync(p);
+      } catch (e) { return { ok: false, output: 'delete failed: ' + (e.message || e) }; }
       return { ok: true, output: 'deleted ' + a.path };
     }
     case 'search_files': {

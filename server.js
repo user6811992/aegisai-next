@@ -93,7 +93,10 @@ function checkAuth(req) {
   if (!TOKEN) return true; // no token configured => open (dev default)
   const h = req.headers['x-auth-token'] || req.headers['authorization'] || '';
   const tok = h.startsWith('Bearer ') ? h.slice(7) : h;
-  return tok === TOKEN;
+  if (typeof tok !== 'string' || tok.length !== TOKEN.length) return false;
+  try {
+    return require('crypto').timingSafeEqual(Buffer.from(tok), Buffer.from(TOKEN));
+  } catch (e) { return false; }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -104,7 +107,7 @@ const server = http.createServer(async (req, res) => {
       const { runProcess } = require('./server/core/security');
       let ollamaVersion = 'unknown';
       try {
-        const r = await runProcess(process.platform === 'win32' ? 'ollama.exe' : 'ollama', ['--version'], { timeout: 10000, shell: true });
+        const r = await runProcess(process.platform === 'win32' ? 'ollama.exe' : 'ollama', ['--version'], { timeout: 10000 });
         ollamaVersion = (r.out || r.err || '').trim();
       } catch (e) {}
       const st = await integrations.registry.statusAll();
@@ -442,7 +445,7 @@ const server = http.createServer(async (req, res) => {
       if (backends.getType() !== 'ollama') return json(res, 400, { ok: false, error: 'Model pulling only supported for Ollama backend' });
       const { runProcess } = require('./server/core/security');
       const ollamaBin = process.platform === 'win32' ? (process.env.OLLAMA_BIN || 'ollama') : 'ollama';
-      const r = await runProcess(ollamaBin, ['pull', name], { timeout: 1800000, maxBuffer: 10 * 1024 * 1024, shell: true });
+      const r = await runProcess(ollamaBin, ['pull', name], { timeout: 1800000, maxBuffer: 10 * 1024 * 1024 });
       // Strip terminal spinner/ANSI/progress characters
       const clean = (s) => (s || '')
         .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '')  // ANSI escape sequences
@@ -798,36 +801,16 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: false, error: 'Could not find release asset. Visit https://github.com/symgraph/GhidrAssistMCP/releases manually.', status: st.ghidra });
       }
       const zipPath = path.join(DATA_DIR, assetName);
-      const extractDir = path.join(DATA_DIR, 'tools', 'ghidra-mcp');
-      fs.mkdirSync(path.dirname(zipPath), { recursive: true });
+      const extractDir = path.join(installDir, 'Extensions');
+      fs.mkdirSync(extractDir, { recursive: true });
       // Download (follows redirects; rejects non-200)
       await sec.downloadToFile(assetUrl, zipPath);
-      // Extract using PowerShell Expand-Archive
+      // Extract into Ghidra's Extensions dir so the extension is actually installed
       const { runProcess } = require('./server/core/security');
       const psBin = process.platform === 'win32' ? 'powershell.exe' : 'powershell';
-      fs.mkdirSync(extractDir, { recursive: true });
       const r = await runProcess(psBin, ['-NoProfile', '-Command', 'Expand-Archive -Path "' + zipPath + '" -DestinationPath "' + extractDir + '" -Force'], { timeout: 300000 });
-      // Find ghidraRun in extracted dir
-      let ghidraDir = null;
-      const walk = (d) => {
-        try {
-          for (const f of fs.readdirSync(d, { withFileTypes: true })) {
-            const full = path.join(d, f.name);
-            if (f.isDirectory()) {
-              if (fs.existsSync(path.join(full, 'ghidraRun.bat')) || fs.existsSync(path.join(full, 'ghidraRun'))) ghidraDir = ghidraDir || full;
-              walk(full);
-            }
-          }
-        } catch (e) {}
-      };
-      walk(extractDir);
-      if (ghidraDir) {
-        process.env.GHIDRA_INSTALL_DIR = ghidraDir;
-        const ghidra = require('./server/integrations/ghidra');
-        // reset cached url
-      }
       const st = await integrations.registry.statusAll();
-      return json(res, 200, { ok: true, extracted: ghidraDir || extractDir, zip: zipPath, status: st.ghidra });
+      return json(res, 200, { ok: r.ok, extracted: extractDir, zip: zipPath, status: st.ghidra, output: (r.out || '').slice(-500) });
     }
     if (url === '/api/integrations/ghidra/detect' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }

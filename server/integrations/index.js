@@ -22,8 +22,10 @@ function list() { return [...integrations.values()]; }
 async function available() {
   const out = [];
   for (const i of integrations.values()) {
-    const ok = typeof i.isAvailable === 'function' ? await i.isAvailable() : true;
-    if (ok) out.push(i);
+    try {
+      const ok = typeof i.isAvailable === 'function' ? await i.isAvailable() : true;
+      if (ok) out.push(i);
+    } catch (e) { /* skip unavailable integration */ }
   }
   return out;
 }

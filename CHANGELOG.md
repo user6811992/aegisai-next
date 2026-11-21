@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.3] - 2026-11-21
+
+### Fixed
+- Ghidra install-mcp now extracts the extension into `Ghidra/Extensions` (previously extracted to a throwaway dir and searched for `ghidraRun`, so the extension was never installed).
+- `integrations.available()` no longer breaks `/api/agent` if one integration throws.
+- `list_files`/`delete_file` no longer 500 on missing paths; `read_file` rejects files >2MB.
+- `checkAuth` uses timing-safe comparison.
+- Ollama calls no longer use `shell: true` (removes env-controlled binary injection surface).
+- `run_command`/`search_files` robustness (unchanged behavior).
+
 ## [1.1.2] - 2026-11-21
 
 ### Fixed
