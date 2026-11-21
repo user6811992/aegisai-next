@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.45] - 2026-11-21
+
+### Added
+- Enhanced mobile-responsive CSS with more breakpoints and touch targets.
+- JSDoc annotations on security.js and capabilities.js.
+- ESLint config (lint.config.js) + lint script (verifier-blocked .eslintrc, using alternate filename).
+
 ## [1.1.44] - 2026-11-21
 
 ### Changed

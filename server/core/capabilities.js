@@ -1,7 +1,8 @@
 // server/core/capabilities.js
-// Capability-based tool filtering per agent session.
-// allowedTools/deniedTools are arrays of tool name patterns (exact or prefix with *).
-
+/**
+ * Capability-based tool filtering per agent session.
+ * @module capabilities
+ */
 function matches(name, pattern) {
   if (pattern === '*') return true;
   if (pattern.endsWith('*')) return name.startsWith(pattern.slice(0, -1));
