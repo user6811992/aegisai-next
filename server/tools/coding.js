@@ -76,11 +76,11 @@ async function execCodingTool(name, args, projectRoot) {
     case 'run_command': {
       const cmd = a.command;
       if (isDangerousCmd(cmd)) return { ok: false, output: 'BLOCKED: dangerous command' };
-      // Split naively on spaces; prefer runProcess with shell:false is not possible for arbitrary commands.
-      // We refuse shell metacharacters entirely.
       if (/[;&|`$()<>]/.test(cmd)) return { ok: false, output: 'BLOCKED: shell metacharacters not allowed' };
       const parts = cmd.trim().split(/\s+/);
-      return security.runProcess(parts[0], parts.slice(1), { cwd: projectRoot, timeout: a.timeout || 60000 });
+      // On Windows, .cmd/.bat shims (npm, npx, ...) require a shell to execute.
+      const useShell = process.platform === 'win32';
+      return security.runProcess(parts[0], parts.slice(1), { cwd: projectRoot, timeout: a.timeout || 60000, shell: useShell });
     }
     case 'run_python': {
       const code = String(a.code || '');

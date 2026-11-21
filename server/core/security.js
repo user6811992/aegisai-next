@@ -45,6 +45,28 @@ function isSafeUrl(u) {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
   const host = (parsed.hostname || '').toLowerCase();
   if (!host || host === 'localhost' || host === '::1' || host === '0.0.0.0') return false;
+  // IPv6 literal
+  const v6 = host.replace(/^\[|\]$/g, '');
+  if (v6.includes(':')) {
+    if (v6 === '::1' || v6 === '::') return false;
+    if (/^fe[89ab][0-9a-f]:/i.test(v6) || /^fe80::/i.test(v6)) return false; // link-local
+    if (/^f[cd][0-9a-f]{2}:/i.test(v6)) return false; // unique local fc00::/7
+    if (/^ff[0-9a-f]{2}:/i.test(v6)) return false; // multicast
+    // IPv4-mapped
+    const m = v6.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
+    if (m) {
+      const fake = 'http://' + m[1];
+      // reuse IPv4 checks
+      const parts = m[1].split('.').map(Number);
+      const a = parts[0], b = parts[1];
+      if (a === 10 || a === 127 || a === 0) return false;
+      if (a === 169 && b === 254) return false;
+      if (a === 172 && b >= 16 && b <= 31) return false;
+      if (a === 192 && b === 168) return false;
+      if (a === 100 && b >= 64 && b <= 127) return false;
+    }
+    return true;
+  }
   const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (m) {
     const a = +m[1], b = +m[2];
@@ -56,8 +78,6 @@ function isSafeUrl(u) {
     if (a === 192 && b === 168) return false;
     if (a === 100 && b >= 64 && b <= 127) return false;
   }
-  if (host.startsWith('[')) return false;
-  if (/^(fc|fd|fe80|::1)/i.test(host)) return false;
   return true;
 }
 

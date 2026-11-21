@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.4] - 2026-11-21
+
+### Fixed
+- `run_command` now uses a shell on Windows so `.cmd` shims (npm, npx, ...) execute; metacharacter guard retained.
+- `isSafeUrl` now rejects IPv6 link-local/ULA/multicast/unspecified and IPv4-mapped addresses.
+
 ## [1.1.3] - 2026-11-21
 
 ### Fixed
