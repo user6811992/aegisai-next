@@ -79,6 +79,7 @@ async function execCodingTool(name, args, projectRoot) {
       const cmd = a.command;
       if (isDangerousCmd(cmd)) return { ok: false, output: 'BLOCKED: dangerous command' };
       if (/[;&|`$()<>]/.test(cmd)) return { ok: false, output: 'BLOCKED: shell metacharacters not allowed' };
+      if (/[\r\n]/.test(cmd)) return { ok: false, output: 'BLOCKED: newlines not allowed' };
       // Quote-aware split so arguments containing spaces survive.
       const parts = [];
       let cur = '';

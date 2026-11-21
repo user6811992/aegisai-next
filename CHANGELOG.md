@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.14] - 2026-11-21
+
+### Fixed
+- Rate limiter now only trusts `X-Forwarded-For` from loopback peers (prevents IP spoofing).
+- Rate limiter strict-path matching now uses exact endpoint list (no false positives).
+- `run_command` now blocks newlines (defense-in-depth).
+
 ## [1.1.13] - 2026-11-21
 
 ### Added

@@ -17,13 +17,22 @@ function isLoopback(ip) {
 
 function isStrictPath(url) {
   if (url === '/api/agent' || url === '/api/pull-model') return true;
-  if (url.startsWith('/api/integrations/') && /install/i.test(url)) return true;
+  if (url === '/api/integrations/ghidra/install-mcp') return true;
+  if (url === '/api/integrations/craft/install' || url === '/api/integrations/craft/install-rust') return true;
+  if (url === '/api/integrations/rea/update' || url === '/api/integrations/awesome-re/update') return true;
   return false;
 }
 
 function check(req, res) {
   if (LIMIT <= 0) return true;
-  const ip = (req.socket && req.socket.remoteAddress) || req.headers['x-forwarded-for'] || '';
+  const rawIp = (req.socket && req.socket.remoteAddress) || '';
+  // Only trust X-Forwarded-For when the direct peer is loopback (i.e. behind a
+  // local reverse proxy); otherwise a client could spoof its IP to evade limits.
+  let ip = rawIp;
+  if (isLoopback(rawIp)) {
+    const xff = req.headers['x-forwarded-for'];
+    if (xff) ip = String(xff).split(',')[0].trim();
+  }
   if (isLoopback(ip)) return true;
   const url = (req.url || '').split('?')[0];
   const limit = isStrictPath(url) ? STRICT : LIMIT;
