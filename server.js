@@ -111,7 +111,7 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/openapi.json' && req.method === 'GET') {
       const fs = require('fs');
       const path = require('path');
-      try { return json(res, 200, JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'openapi.json'), 'utf8'))); }
+      try { return json(res, 200, JSON.parse(fs.readFileSync(path.join(__dirname, 'openapi.json'), 'utf8'))); }
       catch (e) { return json(res, 404, { ok: false, error: 'not found' }); }
     }
     if (url === '/api/compare' && req.method === 'POST') {

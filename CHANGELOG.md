@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.29] - 2026-11-21
+
+### Fixed
+- OpenAPI endpoint path corrected (`__dirname` instead of `__dirname/..`).
+
 ## [1.1.28] - 2026-11-21
 
 ### Added
