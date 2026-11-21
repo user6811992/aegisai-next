@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.18] - 2026-11-21
+
+### Fixed
+- Settings modal inputs now reflect persisted values (controlled via `settingsCfg` state loaded on open).
+- Added `defaultValue` binding for maxHistory, maxTokens, fallbackModels, includeMemories checkbox.
+
 ## [1.1.17] - 2026-11-21
 
 ### Fixed
