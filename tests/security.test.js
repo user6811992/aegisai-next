@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+require('./helpers/isolated-data');
 const app = require('../server.js');
 
 test('runProcess never interprets shell metacharacters', async () => {

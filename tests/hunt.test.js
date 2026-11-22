@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+require('./helpers/isolated-data');
 const app = require('../server.js');
 const taskModule = require('../server/agent/task');
 const { toSubtasks, resolveRetries, resolveBudget, createSwarmSignal } = require('../server/agent/swarm');

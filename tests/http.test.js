@@ -9,6 +9,7 @@ const path = require('path');
 // Use a temp data dir to avoid leftover state from other runs.
 process.env.AEGISAI_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-http-'));
 
+require('./helpers/isolated-data');
 const app = require('../server.js');
 
 let serverInstance;

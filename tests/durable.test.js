@@ -1,7 +1,8 @@
 // tests/durable.test.js
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-require('../server.js'); // opens the shared SQLite database
+require('./helpers/isolated-data');
+require('../server.js'); // opens this worker's isolated SQLite database
 const durable = require('../server/runtime/durable');
 const { createRuntime } = require('../server/runtime/always-on');
 

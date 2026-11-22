@@ -10,6 +10,7 @@ process.env.AEGISAI_DATA_DIR = DATA_DIR;
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
+require('./helpers/isolated-data');
 const app = require('../server.js');
 
 let serverInstance;

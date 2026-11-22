@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.56] - 2026-11-22
+
+### Fixed
+- Test isolation: each `node --test` worker now uses its own temporary `AEGISAI_DATA_DIR`, eliminating the "DB open failed: database is locked" warning caused by parallel test processes sharing one SQLite file.
+
 ## [1.1.55] - 2026-11-22
 
 ### Fixed

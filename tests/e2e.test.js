@@ -10,6 +10,7 @@ const path = require('path');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aegis-e2e-'));
 process.env.AEGISAI_DATA_DIR = tmpDir;
 
+require('./helpers/isolated-data');
 const app = require('../server.js');
 
 let serverInstance;
