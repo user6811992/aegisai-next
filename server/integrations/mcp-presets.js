@@ -66,4 +66,4 @@ function buildPresets(ids, projectRoot) {
   return out;
 }
 
-module.exports = { buildPresets, PRESETS };
+module.exports = { buildPresets, PRESETS, wrap };

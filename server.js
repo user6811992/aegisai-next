@@ -287,6 +287,39 @@ const server = http.createServer(async (req, res) => {
         return json(res, 500, { ok: false, error: String(e.message || e) });
       }
     }
+    if (url === '/api/integrations/mcp/registry' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      try {
+        const params = new URL(req.url, 'http://localhost').searchParams;
+        const registry = require('./server/integrations/mcp-registry');
+        const result = await registry.fetchRegistry({
+          query: params.get('query') || '',
+          limit: parseInt(params.get('limit'), 10) || 20,
+          cursor: params.get('cursor') || '',
+        });
+        return json(res, 200, result);
+      } catch (e) {
+        return json(res, 502, { ok: false, error: String(e.message || e) });
+      }
+    }
+    if (url === '/api/integrations/mcp/registry/install' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (typeof body.name !== 'string' || !body.name) return json(res, 400, { ok: false, error: 'name is required' });
+      try {
+        const registry = require('./server/integrations/mcp-registry');
+        const result = await registry.fetchRegistry({ query: body.name, limit: 20 });
+        const match = result.servers.find((s) => s.name === body.name && (!body.version || s.version === body.version))
+          || result.servers.find((s) => s.name === body.name);
+        if (!match) return json(res, 404, { ok: false, error: 'registry server not found' });
+        const spec = registry.buildSpec(match, { id: body.id });
+        registry.install(spec);
+        return json(res, 200, { ok: true, server: spec });
+      } catch (e) {
+        return json(res, 400, { ok: false, error: e.message || String(e) });
+      }
+    }
     if (url === '/api/integrations/mcp/presets' && req.method === 'POST') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       let body;

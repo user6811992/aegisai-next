@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.66] - 2026-11-22
+
+### Added
+- F9-4: MCP registry browser and install flow. `GET /api/integrations/mcp/registry` searches registry.modelcontextprotocol.io (60s cache); `POST /api/integrations/mcp/registry/install` re-fetches an entry by name and installs a validated spec. Only strict npm/pypi package identifiers and safe remote URLs are accepted; unsafe registry entries are rejected.
+
 ## [1.1.65] - 2026-11-22
 
 ### Added
