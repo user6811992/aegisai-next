@@ -10,6 +10,10 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
 
+// This process is itself an MCP server; never spawn configured MCP clients
+// from here (that would recursively launch more copies of this server).
+process.env.AEGISAI_MCP_SERVER = '1';
+
 const config = require('./server/core/config');
 const security = require('./server/core/security');
 const integrations = require('./server/integrations/register');

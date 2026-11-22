@@ -52,6 +52,11 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 - **Install buttons** — install REA, Craft, Ghidra MCP from UI
 - **Configure** — set env vars from UI (persisted to data/integrations.json)
 - **Backend switcher** — change backend type/URL at runtime
+- **MCP client** — spawn configured MCP servers (e.g. Filesystem, Git, Fetch, Memory) and expose their tools to the agent as `mcp_<id>__<tool>`; configure under `mcpServers` in `data/integrations.json`:
+  ```json
+  { "mcpServers": [{ "id": "fs", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:/allowed"] }] }
+  ```
+  On Windows use `"command": "cmd", "args": ["/c", "npx", ...]`. Only `npx`, `uvx`, `node`, `python`/`python3` (or absolute paths to those executables) are accepted; no arbitrary shell commands.
 - **Pending actions** — human-in-the-loop approve/reject
 - **Version checking** — check AegisAI, Node, Ollama, REA versions
 - **Error log viewer** — view server error log

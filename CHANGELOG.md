@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.63] - 2026-11-22
+
+### Added
+- F9-1: generic MCP client integration. Configure stdio MCP servers under `mcpServers` in `data/integrations.json`; their tools appear to the agent as `mcp_<id>__<tool>`. Commands are restricted to npx/uvx/node/python runtimes (including `cmd /c <allowed>` on Windows). README documents the config.
+
 ## [1.1.62] - 2026-11-22
 
 ### Added
