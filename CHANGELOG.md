@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.61] - 2026-11-22
+
+### Changed
+- CI and installer workflows upgraded to `actions/checkout@v6`, `actions/setup-node@v6` and `actions/upload-artifact@v6` (all target Node 24), removing the Node 20 deprecation annotation on workflow runs.
+
 ## [1.1.60] - 2026-11-22
 
 ### Fixed
