@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.69] - 2026-11-22
+
+### Added
+- F10-3: dependency-only patch proposals for the bug-hunting pipeline. A new `patch` phase runs between verify and report, and the `patch_propose` tool generates a dry-run `package.json` version diff (or applies it with `dryRun:false`) with strict name/version validation and path containment.
+
+### Changed
+- Default hunt phases are now `recon → probe → verify → patch → report`.
+
 ## [1.1.68] - 2026-11-22
 
 ### Added

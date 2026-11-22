@@ -66,6 +66,7 @@ async function runAgent(opts) {
     for (const t of (externalTools.hunt || [])) extDefs.push({ src: 'hunt', tool: t });
     for (const t of (externalTools.mcp || [])) extDefs.push({ src: 'mcp', tool: t });
     for (const t of (externalTools.search || [])) extDefs.push({ src: 'search', tool: t });
+    for (const t of (externalTools.patch || [])) extDefs.push({ src: 'patch', tool: t });
   }
   for (const { src, tool } of extDefs) {
     tools.push({
@@ -83,7 +84,7 @@ async function runAgent(opts) {
 
   // budget trim: coding first, then externals
   if (tools.length > toolBudget) {
-    const external = (n) => n.startsWith('ghidra_') || n.startsWith('craft_') || n.startsWith('are_') || n.startsWith('rea_') || n.startsWith('hunt_') || n.startsWith('mcp_') || n.startsWith('search_');
+    const external = (n) => n.startsWith('ghidra_') || n.startsWith('craft_') || n.startsWith('are_') || n.startsWith('rea_') || n.startsWith('hunt_') || n.startsWith('mcp_') || n.startsWith('search_') || n.startsWith('patch_');
     const codingTools = tools.filter((t) => !external(t.function.name));
     const externals = tools.filter((t) => external(t.function.name));
     const kept = [...codingTools];
@@ -166,6 +167,15 @@ async function runAgent(opts) {
           } else {
             result = { ok: false, output: 'HUNT not available' };
           }
+        } else if (name.startsWith('patch_')) {
+          const toolName = name.slice(6);
+          const intg = integrations.registry.list().find((i) => i.name === 'patch');
+          if (intg && typeof intg.callTool === 'function') {
+            const r = await intg.callTool(toolName, args);
+            result = { ok: true, output: JSON.stringify(r).slice(0, 2000) };
+          } else {
+            result = { ok: false, output: 'patch integration not available' };
+          }
         } else if (name.startsWith('search_')) {
           const toolName = name.slice(7);
           const intg = integrations.registry.list().find((i) => i.name === 'search');
@@ -217,7 +227,7 @@ async function runAgent(opts) {
   return { final: { type: 'done', final: '(max iterations reached)', toolLog }, toolLog };
 }
 
-const HUNT_PHASES = ['recon', 'probe', 'verify', 'report'];
+const HUNT_PHASES = ['recon', 'probe', 'verify', 'patch', 'report'];
 
 function huntPhasePrompt(phase, ctx) {
   const target = (ctx && ctx.target) || 'the target';
@@ -230,6 +240,9 @@ function huntPhasePrompt(phase, ctx) {
   }
   if (phase === 'verify') {
     return 'HUNT_PHASE=verify. You are in the verify phase of a bug hunt against ' + target + '. Prove each candidate with a concrete reproduction before reporting.';
+  }
+  if (phase === 'patch') {
+    return 'HUNT_PHASE=patch. You are in the patch phase of a bug hunt against ' + target + '. For verified findings with a known vulnerable dependency, call patch_propose (dry-run) with the dependency name and fixed version. Only dependency-only fixes are supported; do not edit source files.';
   }
   if (phase === 'report') {
     return 'HUNT_PHASE=report. You are in the report phase of a bug hunt against ' + target + '. Call the hunt_report tool with the verified findings and produce the final report.';
