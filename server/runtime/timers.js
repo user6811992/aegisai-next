@@ -6,7 +6,7 @@
 const DEFAULT_POLL_MS = 1000;
 
 function createTimerScheduler(opts = {}) {
-  const enqueue = typeof opts.enqueue === 'function' ? opts.enqueue : () => null;
+  let enqueue = typeof opts.enqueue === 'function' ? opts.enqueue : () => null;
   const timers = new Map();
   let seq = 0;
 
@@ -78,7 +78,11 @@ function createTimerScheduler(opts = {}) {
     timers.clear();
   }
 
-  return { schedule, cancel, cancelSession, list, clear, timers };
+  function setEnqueue(fn) {
+    if (typeof fn === 'function') enqueue = fn;
+  }
+
+  return { schedule, cancel, cancelSession, list, clear, setEnqueue, timers };
 }
 
 module.exports = { createTimerScheduler, DEFAULT_POLL_MS };

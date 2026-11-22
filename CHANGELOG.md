@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.72] - 2026-11-22
+
+### Added
+- Scheduled memory consolidation: a 24h (configurable via `AEGISAI_CONSOLIDATION_INTERVAL_MS`) sleep pass runs the F10-2 consolidation automatically, with `/api/memory/consolidation/{status,start,stop,run}` controls and audit logging. `createTimerScheduler` gained `setEnqueue` to route timer ticks into the consolidation runner.
+
 ## [1.1.71] - 2026-11-22
 
 ### Added

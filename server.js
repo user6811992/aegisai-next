@@ -21,6 +21,8 @@ const delivery = require('./server/runtime/delivery');
 const speedbench = require('./server/eval/speedbench');
 const markdownMemory = require('./server/storage/markdown-memory');
 const skillEval = require('./server/eval/skill-eval');
+const consolidationScheduler = require('./server/runtime/consolidation-scheduler');
+const consolidation = consolidationScheduler.createConsolidationScheduler();
 const durable = require('./server/runtime/durable');
 const timers = require('./server/runtime/timers');
 const alwaysOnEval = require('./server/eval/always-on-eval');
@@ -37,6 +39,10 @@ const intConfig = require('./server/storage/integrations-config');
 intConfig.apply(intConfig.load());
 
 integrations.registerAll();
+
+const consolidationInterval = parseInt(process.env.AEGISAI_CONSOLIDATION_INTERVAL_MS, 10);
+if (Number.isFinite(consolidationInterval) && consolidationInterval > 0) consolidation.start({ everyMs: consolidationInterval });
+else consolidation.start();
 
 let projectRoot = null;
 
@@ -599,6 +605,24 @@ const server = http.createServer(async (req, res) => {
       const params = new URL(req.url, 'http://localhost').searchParams;
       const results = markdownMemory.search(params.get('q') || '', parseInt(params.get('limit'), 10) || 5);
       return json(res, 200, { ok: true, results });
+    }
+    if (url === '/api/memory/consolidation/status' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { ok: true, ...consolidation.status() });
+    }
+    if (url === '/api/memory/consolidation/start' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { body = {}; }
+      return json(res, 200, { ok: true, ...consolidation.start(body) });
+    }
+    if (url === '/api/memory/consolidation/stop' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      return json(res, 200, { ok: true, ...consolidation.stop() });
+    }
+    if (url === '/api/memory/consolidation/run' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      try { return json(res, 200, { ok: true, report: await consolidation.runNow() }); }
+      catch (e) { return json(res, 500, { ok: false, error: String(e.message || e) }); }
     }
     // ---------- Documents (PDF/DOCX text extraction + RAG) ----------
     if (url === '/api/documents' && req.method === 'GET') {
@@ -1437,6 +1461,7 @@ module.exports = {
   restoreRuntime: durable.restoreRuntime,
   createRuntimeApprovalGate,
   createTimerScheduler: timers.createTimerScheduler,
+  consolidation,
   evaluateAlwaysOn: alwaysOnEval.evaluateAlwaysOn,
   isCleanRoomBlocked: agent.isCleanRoomBlocked,
   backends,
