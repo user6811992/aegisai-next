@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.60] - 2026-11-22
+
+### Fixed
+- The `.iss` version fallback is now guarded by `#ifndef`, so the `/DMyAppVersion` value passed by `build.ps1` is no longer overwritten by the script's own `#define` (the v1.1.59 workflow produced a 1.1.58-named installer and failed its output check).
+
 ## [1.1.59] - 2026-11-22
 
 ### Added
