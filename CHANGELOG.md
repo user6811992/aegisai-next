@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.65] - 2026-11-22
+
+### Added
+- F9-1 extended: the MCP client now supports Streamable HTTP servers via `{"id":"x","url":"http://127.0.0.1:3001/mcp"}`. Loopback is allowed for local servers; public URLs must pass the SSRF guard and URLs with credentials are rejected. 2 new tests (real HTTP MCP server round-trip).
+
 ## [1.1.64] - 2026-11-22
 
 ### Added

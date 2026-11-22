@@ -19,9 +19,22 @@ const PATH_ARGS = ['path', 'paths', 'file_path', 'directory', 'source', 'destina
 let initPromise = null;
 let entries = new Map();
 
+// Loopback is allowed for locally hosted MCP servers (the reference servers
+// default to 127.0.0.1:3001), but credentials and non-loopback private hosts
+// stay blocked.
+function validMcpUrl(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return false;
+  let u;
+  try { u = new URL(raw); } catch (e) { return false; }
+  if ((u.protocol !== 'http:' && u.protocol !== 'https:') || u.username || u.password) return false;
+  if (security.isSafeUrl(raw)) return true;
+  return ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(u.hostname);
+}
+
 function validSpec(s) {
   if (!s || typeof s !== 'object') return false;
   if (typeof s.id !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(s.id)) return false;
+  if (s.url) return validMcpUrl(s.url) && s.command === undefined && s.args === undefined;
   if (typeof s.command !== 'string' || !s.command || s.command.length > 200) return false;
   if (!Array.isArray(s.args) || s.args.length > 32 || !s.args.every((a) => typeof a === 'string')) return false;
   // Allow bare command names and absolute executable paths whose basename is
@@ -45,10 +58,19 @@ async function loadSdk() {
   try {
     const sdk = require('@modelcontextprotocol/sdk/client');
     const stdio = require('@modelcontextprotocol/sdk/client/stdio.js');
-    return { Client: sdk.Client, StdioClientTransport: stdio.StdioClientTransport };
+    const httpMod = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+    return {
+      Client: sdk.Client,
+      StdioClientTransport: stdio.StdioClientTransport,
+      StreamableHTTPClientTransport: httpMod.StreamableHTTPClientTransport,
+    };
   } catch (e) {
     const sdk = require('@modelcontextprotocol/sdk');
-    return { Client: sdk.Client, StdioClientTransport: sdk.StdioClientTransport };
+    return {
+      Client: sdk.Client,
+      StdioClientTransport: sdk.StdioClientTransport,
+      StreamableHTTPClientTransport: sdk.StreamableHTTPClientTransport,
+    };
   }
 }
 
@@ -57,18 +79,24 @@ async function init() {
   if (process.env.AEGISAI_MCP_SERVER === '1') return;
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const { Client, StdioClientTransport } = await loadSdk();
+    const { Client, StdioClientTransport, StreamableHTTPClientTransport } = await loadSdk();
     for (const spec of readSpecs()) {
       const entry = { spec, client: null, tools: [], error: null };
       entries.set(spec.id, entry);
       try {
-        const env = Object.assign({}, process.env, spec.env && typeof spec.env === 'object' ? spec.env : {});
-        const transport = new StdioClientTransport({
-          command: spec.command,
-          args: spec.args,
-          env,
-          stderr: 'pipe',
-        });
+        let transport;
+        if (spec.url) {
+          if (!StreamableHTTPClientTransport) throw new Error('Streamable HTTP transport unavailable in this SDK version');
+          transport = new StreamableHTTPClientTransport(new URL(spec.url));
+        } else {
+          const env = Object.assign({}, process.env, spec.env && typeof spec.env === 'object' ? spec.env : {});
+          transport = new StdioClientTransport({
+            command: spec.command,
+            args: spec.args,
+            env,
+            stderr: 'pipe',
+          });
+        }
         const client = new Client({ name: 'aegisai-next', version: '0.3.0' }, { capabilities: {} });
         await client.connect(transport);
         const res = await client.listTools();
@@ -156,4 +184,4 @@ async function closeAll() {
 
 const integration = { name: 'mcp', isAvailable, tools, status, callTool, init, closeAll };
 
-module.exports = { integration, init, callTool, closeAll, validSpec, validateToolArgs, SEP };
+module.exports = { integration, init, callTool, closeAll, validSpec, validMcpUrl, validateToolArgs, SEP };
