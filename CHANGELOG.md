@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.57] - 2026-11-22
+
+### Changed
+- README: added a "Prior art & inspiration" acknowledgment section crediting the open-source projects whose public descriptions informed the F1/F2/F6/F7/F8 work; explicitly notes that no source code was copied and the project remains MIT-licensed.
+
 ## [1.1.56] - 2026-11-22
 
 ### Fixed

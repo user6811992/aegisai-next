@@ -188,6 +188,17 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
+### Prior art & inspiration
+The agent capabilities added in v1.1.54–v1.1.56 were informed by the public descriptions and feature sets of these projects. No source code or assets were copied from them; AegisAI (next) remains MIT-licensed.
+
+- **Bug hunting (F1)** — [elementalsouls/Claude-BugHunter](https://github.com/elementalsouls/Claude-BugHunter), [h4ckologic/bughunter-ai](https://github.com/h4ckologic/bughunter-ai), [pikpikcu/airecon](https://github.com/pikpikcu/airecon), [H-mmer/pentest-agents](https://github.com/H-mmer/pentest-agents), [awarexone/Agentic-Bug-Hunter](https://github.com/awarexone/Agentic-Bug-Hunter)
+- **Agent harnesses & long-horizon tasks (F2)** — [bytedance/deer-flow](https://github.com/bytedance/deer-flow), [ruvnet/ruflo](https://github.com/ruvnet/ruflo), [zhayujie/CowAgent](https://github.com/zhayujie/CowAgent), [langchain-ai/deepagents](https://github.com/langchain-ai/deepagents), [openai/openai-agents-python](https://github.com/openai/openai-agents-python)
+- **Always-on runtime (F6 / F8)** — [diggerhq/opencomputer](https://github.com/diggerhq/opencomputer), [diggerhq/opendots](https://github.com/diggerhq/opendots), [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw), [ShenSeanChen/waku-agent](https://github.com/ShenSeanChen/waku-agent), [bubbleptr/aoa](https://github.com/bubbleptr/aoa)
+- **Benchmarks & evaluation (F7 / F8-4)** — [diggerhq/speedbench](https://github.com/diggerhq/speedbench), [Always-On-Intelligence/HALO](https://github.com/Always-On-Intelligence/HALO)
+- **Memory & self-evolution ideas (parked)** — [volcengine/OpenViking](https://github.com/volcengine/OpenViking), [openmemind/memind](https://github.com/openmemind/memind), [rohitg00/agentmemory](https://github.com/rohitg00/agentmemory)
+
+### Tooling & dependencies
+
 - [Ollama](https://ollama.com) — local LLM runtime
 - [morluto/rea](https://github.com/morluto/rea) — reverse engineering agent (255 tools)
 - [symgraph/GhidrAssistMCP](https://github.com/symgraph/GhidrAssistMCP) — Ghidra MCP extension
