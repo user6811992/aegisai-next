@@ -20,6 +20,7 @@ const runtime = require('./server/runtime/always-on');
 const delivery = require('./server/runtime/delivery');
 const speedbench = require('./server/eval/speedbench');
 const markdownMemory = require('./server/storage/markdown-memory');
+const skillEval = require('./server/eval/skill-eval');
 const durable = require('./server/runtime/durable');
 const timers = require('./server/runtime/timers');
 const alwaysOnEval = require('./server/eval/always-on-eval');
@@ -491,6 +492,24 @@ const server = http.createServer(async (req, res) => {
       }
       res.end();
       return;
+    }
+    if (url === '/api/skills/evaluate' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      try { return json(res, 200, skillEval.evaluateAll()); }
+      catch (e) { return json(res, 500, { ok: false, error: String(e.message || e) }); }
+    }
+    if (url === '/api/skills/evaluate' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (typeof body.name !== 'string' || !body.name) return json(res, 400, { ok: false, error: 'name required' });
+      if (body.name.startsWith('mcp:')) {
+        const tool = require('./server/integrations/mcp').integration.tools().find((t) => t.name === body.name.slice(4));
+        if (!tool) return json(res, 404, { ok: false, error: 'tool not found' });
+        return json(res, 200, skillEval.evaluateTool(tool));
+      }
+      const skill = db.getSkill(body.name);
+      if (!skill) return json(res, 404, { ok: false, error: 'skill not found' });
+      return json(res, 200, skillEval.evaluateSkill(skill));
     }
     // ---------- Memory ----------
     if (url === '/api/memory' && req.method === 'GET') {

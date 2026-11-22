@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.70] - 2026-11-22
+
+### Added
+- F10-4: skill and MCP-tool evaluation gates. `GET /api/skills/evaluate` scores all skills/tool descriptors on quality, security patterns (shell exec, network, credential access, writes, obfuscation) and harness compatibility; `POST /api/skills/evaluate` checks one item. Critical findings force a fail decision.
+
 ## [1.1.69] - 2026-11-22
 
 ### Added

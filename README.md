@@ -42,6 +42,7 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 - **RAG reindex** — re-embed all memories with current model
 - **Markdown mirror** — memories export to `data/memories.md`; import via `POST /api/memory/markdown/import`
 - **Sleep consolidation** — `POST /api/memory/consolidate` merges near-duplicate facts and rewrites the Markdown mirror; `GET /api/memory/search?q=&limit=` provides ranked local retrieval without embeddings
+- **Skill evaluation gates** — `GET /api/skills/evaluate` scores every skill and MCP tool descriptor on quality, security scanning and harness compatibility, returning pass/warn/fail with reasons; `POST /api/skills/evaluate` with `{"name":"..."}` checks one skill (or `mcp:<tool>`)
 
 ### Reverse Engineering (optional)
 - **REA MCP** — 255 RE tools (binaries, JS/Electron, Android, firmware, etc.)
