@@ -39,6 +39,8 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 - **Skills panel** — add/delete/run custom skills
 - **RAG search** — cosine similarity search over memories
 - **RAG reindex** — re-embed all memories with current model
+- **Markdown mirror** — memories export to `data/memories.md`; import via `POST /api/memory/markdown/import`
+- **Sleep consolidation** — `POST /api/memory/consolidate` merges near-duplicate facts and rewrites the Markdown mirror; `GET /api/memory/search?q=&limit=` provides ranked local retrieval without embeddings
 
 ### Reverse Engineering (optional)
 - **REA MCP** — 255 RE tools (binaries, JS/Electron, Android, firmware, etc.)

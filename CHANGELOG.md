@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.68] - 2026-11-22
+
+### Added
+- F10-2: Markdown memory mirror and sleep-time consolidation. Memories export atomically to `data/memories.md`, can be re-imported, and near-duplicates are merged by token similarity. Added ranked local search that works without embeddings, plus `GET /api/memory/markdown`, `POST /api/memory/markdown/import`, `POST /api/memory/consolidate` and `GET /api/memory/search`.
+
 ## [1.1.67] - 2026-11-22
 
 ### Added

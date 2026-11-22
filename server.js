@@ -19,6 +19,7 @@ const swarm = require('./server/agent/swarm');
 const runtime = require('./server/runtime/always-on');
 const delivery = require('./server/runtime/delivery');
 const speedbench = require('./server/eval/speedbench');
+const markdownMemory = require('./server/storage/markdown-memory');
 const durable = require('./server/runtime/durable');
 const timers = require('./server/runtime/timers');
 const alwaysOnEval = require('./server/eval/always-on-eval');
@@ -530,6 +531,39 @@ const server = http.createServer(async (req, res) => {
       db.deleteMemory(body.id);
       db.logAudit('memory.delete', { id: body.id }, req.socket && req.socket.remoteAddress);
       return json(res, 200, { ok: true });
+    }
+    if (url === '/api/memory/markdown' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      try {
+        const file = markdownMemory.memoryFile();
+        const markdown = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+        return json(res, 200, { ok: true, file, markdown });
+      } catch (e) { return json(res, 500, { ok: false, error: String(e.message || e) }); }
+    }
+    if (url === '/api/memory/markdown/import' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      if (typeof body.markdown !== 'string') return json(res, 400, { ok: false, error: 'markdown required' });
+      try {
+        const result = markdownMemory.importMarkdown(body.markdown);
+        db.logAudit('memory.markdown.import', { imported: result.imported }, req.socket && req.socket.remoteAddress);
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) { return json(res, 500, { ok: false, error: String(e.message || e) }); }
+    }
+    if (url === '/api/memory/consolidate' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { body = {}; }
+      try {
+        const result = markdownMemory.consolidate(body.threshold ? { threshold: body.threshold } : {});
+        db.logAudit('memory.consolidate', { mergedGroups: result.mergedGroups, mergedCount: result.mergedCount }, req.socket && req.socket.remoteAddress);
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) { return json(res, 500, { ok: false, error: String(e.message || e) }); }
+    }
+    if (url === '/api/memory/search' && req.method === 'GET') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const results = markdownMemory.search(params.get('q') || '', parseInt(params.get('limit'), 10) || 5);
+      return json(res, 200, { ok: true, results });
     }
     // ---------- Documents (PDF/DOCX text extraction + RAG) ----------
     if (url === '/api/documents' && req.method === 'GET') {
