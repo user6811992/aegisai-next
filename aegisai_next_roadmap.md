@@ -158,3 +158,19 @@ Roadmap for **AegisAI (next)** — the local-first AI agent product at `github.c
 - [x] F9-3 landed — Expose AegisAI as an MCP server: `mcp-server.js` (stdio, `npm run mcp`) registers `aegisai_health`, `aegisai_agent`, `aegisai_hunt`, `aegisai_task`, `aegisai_swarm`; project root validated against `AEGISAI_PROJECT_ROOT_ALLOWLIST` before agent tools run; 2 new MCP client tests; suite 87/87 pass. README includes client config example.
 - [x] F9-4 landed — MCP registry browser / install flow: `server/integrations/mcp-registry.js` searches registry.modelcontextprotocol.io (60s cache, `MCP_REGISTRY_URL` override), maps npm/pypi packages and safe remote URLs to validated specs, `GET /api/integrations/mcp/registry` + `POST /api/integrations/mcp/registry/install`; strict identifier/URL validation rejects untrusted entries; 4 new tests; suite 102/102 pass.
 - Parked: reusing the reference Memory knowledge-graph server duplicates our SQLite memory/RAG layer — **low priority**.
+
+## F10 — Agent infrastructure refresh (seeded 2026-11-22 from fresh ecosystem scan)
+
+**Sources:** GitHub API searches for repos created after 2026-06-01 (coding agent harness, agent memory, sandbox, MCP tools, security agents, evaluation harness) plus license checks. All candidates are Apache-2.0/MIT; integrate via configs or original implementations — no code copying.
+
+- [x] F10-1 landed — External search bridge: `server/integrations/mcp-search.js` discovers MCP tools from servers with `role:"search"` (or search-like tool names), exposes a unified `search_external` agent tool that fans out with per-source results, wired into registry + `/api/agent` ext gathering + `run.js` defs/budget/dispatch; `mcp.js` validates the new `role` field. xerj documented via its Streamable HTTP endpoint. 4 new tests; suite 106/106 pass.
+- [ ] F10-2 — **Markdown memory + sleep-time consolidation**: `tigerless-labs/agent-memory` (4.3k★, MIT) uses Markdown as source of truth with local ranked retrieval and a "sleep" consolidation pass. Add consolidation over our SQLite memory/RAG. **Feasibility: high**.
+- [ ] F10-3 — **Autonomous vuln patching extension to F1**: `google/mantis` (2.8k★, Apache-2.0) finds, reproduces and patches vulnerabilities. Add a `patch` phase after verify with dependency-only fixes. **Feasibility: medium** (diff safety).
+- [ ] F10-4 — **Skill/plugin evaluation gates**: `NVIDIA/SkillEvaluator` (4.4k★, Apache-2.0) evaluates skills/plugins with quality gates and security scanning; extend F7/F8 eval to default skills and MCP descriptors. **Feasibility: medium-high**.
+
+**Parked candidates (recorded, not scheduled):**
+- `davidondrej/cloudroom` (1.8k★, Apache-2.0) — isolated sandboxes for any harness incl. OpenCode, live session migration; overlaps F6/F8, **medium**.
+- `BitMiracle-AI/Dormice` (2k★) / `Ephemeral-AI-Lab/layerfs` (2.9k★) — persistent agent sandbox/filesystem layers; larger infra, **low-medium**.
+- `HarnessRouter/harnessrouter` (4.4k★, Apache-2.0) — unified harness interface; overlaps our multi-backend layer, **medium**.
+- `wangmiaozero/pi-harness` (341★) — observability/governance/recovery; overlaps F4/F8, **medium**.
+- Content-only: `cobusgreyling/loop-engineering` (11.8k★), `superdesigndev/treg` (8.7k★), `Yeti-791/Awesome-Offensive-AI-Agentic-Landscape` (504★) — reference material, no code change.

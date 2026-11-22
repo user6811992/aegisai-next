@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.67] - 2026-11-22
+
+### Added
+- F10-1: unified external search bridge. MCP servers configured with `"role":"search"` (or exposing search-like tool names) feed a new `search_external` agent tool that fans out across them and returns per-source results with error isolation. README documents connecting a local xerj index over Streamable HTTP.
+
 ## [1.1.66] - 2026-11-22
 
 ### Added

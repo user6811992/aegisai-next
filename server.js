@@ -430,7 +430,7 @@ const server = http.createServer(async (req, res) => {
       }
       // Gather external tools from available integrations.
       const avail = await integrations.registry.available();
-      const ext = { ghidra: [], craft: [], are: [], rea: [], hunt: [], mcp: [] };
+      const ext = { ghidra: [], craft: [], are: [], rea: [], hunt: [], mcp: [], search: [] };
       for (const i of avail) {
         const ts = (typeof i.tools === 'function') ? i.tools() : [];
         if (i.name === 'ghidra') ext.ghidra = ts;
@@ -439,6 +439,7 @@ const server = http.createServer(async (req, res) => {
         else if (i.name === 'rea') ext.rea = ts;
         else if (i.name === 'hunt') ext.hunt = ts;
         else if (i.name === 'mcp') ext.mcp = ts;
+        else if (i.name === 'search') ext.search = ts;
       }
       // REA tools namespaced as rea_ in agent; map them into ext.rea (already).
       const reqBudget = parseInt(body.toolBudget, 10);

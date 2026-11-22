@@ -58,6 +58,10 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
   ```
   On Windows use `"command": "cmd", "args": ["/c", "npx", ...]`. Only `npx`, `uvx`, `node`, `python`/`python3` (or absolute paths to those executables) are accepted; no arbitrary shell commands.
 - **Streamable HTTP MCP servers** — use `{"id":"remote","url":"http://127.0.0.1:3001/mcp"}` instead of `command`/`args`. Loopback URLs are allowed for locally hosted servers; public URLs must pass the SSRF guard, and credentials in URLs are rejected.
+- **External search bridge** — mark an MCP server with `"role":"search"` (or use a tool whose name contains search/query/find) and the agent gains a unified `search_external` tool that fans out across those servers. For a local [xerj](https://github.com/xerj-org/xerj) index, point its Streamable HTTP endpoint at it:
+  ```json
+  { "mcpServers": [{ "id": "xerj", "url": "http://127.0.0.1:3001/mcp", "role": "search" }] }
+  ```
 - **Registry browser** — `GET /api/integrations/mcp/registry?query=&limit=&cursor=` searches [registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io) (60s cache, `MCP_REGISTRY_URL` overrides the endpoint). `POST /api/integrations/mcp/registry/install` with `{"name":"<registry name>","version":"<optional>","id":"<optional>"}` re-fetches the entry and installs a validated spec. Only npm/pypi package identifiers and safe remote URLs are accepted — registry entries are third-party and untrusted.
 - **Curated presets** — `POST /api/integrations/mcp/presets` with `{"presets":["fs","git","fetch","memory","seq","time"],"root":"<project>"}` installs safe configurations for the official reference servers. Filesystem is pinned to the validated project root, Git tools are filtered to read-only names, and every MCP tool call has its URL/path arguments re-checked against the SSRF/path guards.
 - **Pending actions** — human-in-the-loop approve/reject

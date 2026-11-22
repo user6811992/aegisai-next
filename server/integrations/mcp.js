@@ -34,6 +34,7 @@ function validMcpUrl(raw) {
 function validSpec(s) {
   if (!s || typeof s !== 'object') return false;
   if (typeof s.id !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(s.id)) return false;
+  if (s.role !== undefined && !['search', 'general'].includes(s.role)) return false;
   if (s.url) return validMcpUrl(s.url) && s.command === undefined && s.args === undefined;
   if (typeof s.command !== 'string' || !s.command || s.command.length > 200) return false;
   if (!Array.isArray(s.args) || s.args.length > 32 || !s.args.every((a) => typeof a === 'string')) return false;
@@ -172,6 +173,16 @@ async function status() {
   return { ready: Array.from(entries.values()).some((e) => !!e.client), error: null, toolCount: tools().length, servers };
 }
 
+function getEntries() {
+  return Array.from(entries.entries()).map(([id, e]) => ({
+    id,
+    role: e.spec.role || 'general',
+    ready: !!e.client,
+    error: e.error,
+    tools: e.tools.map((t) => t.name),
+  }));
+}
+
 async function closeAll() {
   for (const entry of entries.values()) {
     if (entry.client && typeof entry.client.close === 'function') {
@@ -184,4 +195,4 @@ async function closeAll() {
 
 const integration = { name: 'mcp', isAvailable, tools, status, callTool, init, closeAll };
 
-module.exports = { integration, init, callTool, closeAll, validSpec, validMcpUrl, validateToolArgs, SEP };
+module.exports = { integration, init, callTool, closeAll, getEntries, validSpec, validMcpUrl, validateToolArgs, SEP };

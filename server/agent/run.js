@@ -65,6 +65,7 @@ async function runAgent(opts) {
     for (const t of (externalTools.rea || [])) extDefs.push({ src: 'rea', tool: t });
     for (const t of (externalTools.hunt || [])) extDefs.push({ src: 'hunt', tool: t });
     for (const t of (externalTools.mcp || [])) extDefs.push({ src: 'mcp', tool: t });
+    for (const t of (externalTools.search || [])) extDefs.push({ src: 'search', tool: t });
   }
   for (const { src, tool } of extDefs) {
     tools.push({
@@ -82,7 +83,7 @@ async function runAgent(opts) {
 
   // budget trim: coding first, then externals
   if (tools.length > toolBudget) {
-    const external = (n) => n.startsWith('ghidra_') || n.startsWith('craft_') || n.startsWith('are_') || n.startsWith('rea_') || n.startsWith('hunt_') || n.startsWith('mcp_');
+    const external = (n) => n.startsWith('ghidra_') || n.startsWith('craft_') || n.startsWith('are_') || n.startsWith('rea_') || n.startsWith('hunt_') || n.startsWith('mcp_') || n.startsWith('search_');
     const codingTools = tools.filter((t) => !external(t.function.name));
     const externals = tools.filter((t) => external(t.function.name));
     const kept = [...codingTools];
@@ -164,6 +165,15 @@ async function runAgent(opts) {
             result = { ok: true, output: JSON.stringify(r).slice(0, 2000) };
           } else {
             result = { ok: false, output: 'HUNT not available' };
+          }
+        } else if (name.startsWith('search_')) {
+          const toolName = name.slice(7);
+          const intg = integrations.registry.list().find((i) => i.name === 'search');
+          if (intg && typeof intg.callTool === 'function') {
+            const r = await intg.callTool(toolName, args);
+            result = { ok: true, output: JSON.stringify(r).slice(0, 2000) };
+          } else {
+            result = { ok: false, output: 'external search not available' };
           }
         } else if (name.startsWith('mcp_')) {
           const internalName = name.slice(4);
