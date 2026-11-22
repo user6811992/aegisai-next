@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.59] - 2026-11-22
+
+### Added
+- GitHub Actions **Windows installer** workflow: builds the frontend and `.exe` on `windows-latest` for every published release, verifies the versioned output, attaches it to the release, and uploads it as a workflow artifact. Supports manual runs against an existing tag.
+
 ## [1.1.58] - 2026-11-22
 
 ### Fixed

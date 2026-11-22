@@ -153,6 +153,8 @@ Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 Output: `installer/output/AegisAI-Next-Setup-<version>.exe` (version is read from `package.json` at build time)
 
+Automated builds: the **Windows installer** workflow compiles the setup on a Windows runner for every published release, verifies the output, and attaches the `.exe` to that release. It can also be run manually from the Actions tab to attach an installer to an existing tag.
+
 ## Installer (macOS)
 
 Requires `create-dmg` (`brew install create-dmg`):
