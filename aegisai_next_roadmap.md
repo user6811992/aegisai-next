@@ -145,7 +145,7 @@ Roadmap for **AegisAI (next)** — the local-first AI agent product at `github.c
 - Sandbox policy from plain-English constitutions (`provos/ironcurtain`, `nolabs-ai/nono`, `perplexityai/SPACE`) — extend `isolation.js` with declarative policy parsing; feasibility medium, higher risk.
 - Local Ollama-native recon agent (`pikpikcu/airecon`, `H-mmer/pentest-agents`, `awarexone/Agentic-Bug-Hunter`) — extends F1 with offline-first recon; feasibility medium.
 - Self-evolving memory/context DB (`volcengine/OpenViking`, `openmemind/memind`) — large scope distinct from the current storage layer; feasibility low-medium.
-- DiggerHQ `opencomputer-example-cve-swarm` — CVE reachability + dependency-only fixes; interesting F1×supply-chain crossover, feasibility medium.
+- [x] DiggerHQ `opencomputer-example-cve-swarm` idea implemented — `server/eval/cve-reachability.js` queries OSV (or offline seed) for package.json deps, reports only reachable advisories and proposes dependency-only fixes via `patch_propose`; `cve_scan` agent tool + `POST /api/security/cve-reachability`; 5 new tests; suite 126/126 pass.
 
 ## F9 — MCP ecosystem interoperability (seeded 2026-11-22 from modelcontextprotocol/servers)
 

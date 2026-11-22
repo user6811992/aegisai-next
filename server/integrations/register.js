@@ -9,6 +9,7 @@ const hunt = require('./hunt');
 const mcp = require('./mcp');
 const mcpSearch = require('./mcp-search');
 const patch = require('./patch');
+const cve = require('./cve');
 
 function registerAll() {
   registry.register(rea.integration);
@@ -20,6 +21,7 @@ function registerAll() {
   registry.register(mcp.integration);
   registry.register(mcpSearch.integration);
   registry.register(patch.integration);
+  registry.register(cve.integration);
 }
 
 module.exports = { registerAll, registry };

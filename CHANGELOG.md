@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.71] - 2026-11-22
+
+### Added
+- CVE reachability (parked DiggerHQ cve-swarm idea): queries OSV for npm dependencies in `package.json`, reports only reachable advisories with fixed versions, and proposes dependency-only patches via `patch_propose`. Exposed as `cve_scan` and `POST /api/security/cve-reachability`; offline analysis supported with seeded advisories.
+
 ## [1.1.70] - 2026-11-22
 
 ### Added

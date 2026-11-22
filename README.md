@@ -27,6 +27,7 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 ### Agent Orchestration & Evaluation
 - **Bug-hunting pipeline** — bug-hunting skill, disclosed-vulnerability pattern library, `hunt` tools (`hunt_start`, `hunt_vuln_search`, `hunt_report`), wave orchestration (recon → probe → verify → **patch** → report) and persisted reports
 - **Dependency patch proposals** — `patch_propose` generates a dry-run `package.json` version bump (diff only) for verified findings; `dryRun:false` applies it with path validation
+- **CVE reachability** — `cve_scan` (or `POST /api/security/cve-reachability`) queries OSV for this project's npm dependencies, reports only reachable advisories and proposes dependency-only fixes; pass `seed` advisories for offline analysis
 - **Long-horizon tasks** — goal → plan → execute → verify → deliver phase driver with sandbox URL/target guards
 - **Swarm orchestration** — fan-out across subtasks with per-subtask retry, cancellation/timeout and tool-budget overrides
 - **Always-on runtime** — persistent sessions with a durable SQLite inbox/outbox, restart restore, per-session isolation policy, approval gates for high-risk jobs, and interval/one-shot timers

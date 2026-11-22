@@ -432,7 +432,7 @@ const server = http.createServer(async (req, res) => {
       }
       // Gather external tools from available integrations.
       const avail = await integrations.registry.available();
-      const ext = { ghidra: [], craft: [], are: [], rea: [], hunt: [], mcp: [], search: [], patch: [] };
+      const ext = { ghidra: [], craft: [], are: [], rea: [], hunt: [], mcp: [], search: [], patch: [], cve: [] };
       for (const i of avail) {
         const ts = (typeof i.tools === 'function') ? i.tools() : [];
         if (i.name === 'ghidra') ext.ghidra = ts;
@@ -443,6 +443,7 @@ const server = http.createServer(async (req, res) => {
         else if (i.name === 'mcp') ext.mcp = ts;
         else if (i.name === 'search') ext.search = ts;
         else if (i.name === 'patch') ext.patch = ts;
+        else if (i.name === 'cve') ext.cve = ts;
       }
       // REA tools namespaced as rea_ in agent; map them into ext.rea (already).
       const reqBudget = parseInt(body.toolBudget, 10);
@@ -510,6 +511,20 @@ const server = http.createServer(async (req, res) => {
       const skill = db.getSkill(body.name);
       if (!skill) return json(res, 404, { ok: false, error: 'skill not found' });
       return json(res, 200, skillEval.evaluateSkill(skill));
+    }
+    if (url === '/api/security/cve-reachability' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      try {
+        const root = body.projectRoot ? security.validateProjectRoot(body.projectRoot, PROJECT_ROOT_ALLOWLIST) : getProjectRoot();
+        if (!root) return json(res, 400, { ok: false, error: 'no project root configured' });
+        const cve = require('./server/eval/cve-reachability');
+        const result = await cve.analyze({ projectRoot: root, seed: body.seed, apply: body.apply === true });
+        db.logAudit('security.cve.reachability', { findings: result.findings.length, proposals: result.proposals.length }, req.socket && req.socket.remoteAddress);
+        return json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        return json(res, e.status || 400, { ok: false, error: e.message || String(e) });
+      }
     }
     // ---------- Memory ----------
     if (url === '/api/memory' && req.method === 'GET') {
