@@ -1,3 +1,8 @@
+> [!CAUTION]
+> **DEPRECATED.** This project (`aegisai-next`) is deprecated and no longer actively maintained.
+> All features have been ported to and superseded by [`aegisai-harness`](https://github.com/user6811992/aegisai-harness),
+> which is now the primary, actively developed project. Please migrate to `aegisai-harness`.
+
 # AegisAI (next)
 
 ![Version](https://img.shields.io/github/v/release/user6811992/aegisai-next) ![License](https://img.shields.io/github/license/user6811992/aegisai-next)
