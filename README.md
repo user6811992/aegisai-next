@@ -56,6 +56,27 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 - **Version checking** — check AegisAI, Node, Ollama, REA versions
 - **Error log viewer** — view server error log
 
+### MCP server (for external coding agents)
+- **stdio MCP server** — `npm run mcp` exposes `aegisai_health`, `aegisai_agent`, `aegisai_hunt`, `aegisai_task` and `aegisai_swarm` to Claude Code, OpenCode, Codex or any MCP client
+- **Scoped by default** — tools that run the agent require `AEGISAI_PROJECT_ROOT` and validate it against `AEGISAI_PROJECT_ROOT_ALLOWLIST`; stdio is reserved for the protocol (all diagnostics go to stderr)
+
+Example MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "aegisai": {
+      "command": "node",
+      "args": ["C:/path/to/aegisai-next/mcp-server.js"],
+      "env": {
+        "AEGISAI_PROJECT_ROOT": "C:/path/to/allowed/project",
+        "AEGISAI_PROJECT_ROOT_ALLOWLIST": "C:/path/to/allowed/project"
+      }
+    }
+  }
+}
+```
+
 ### Infrastructure
 - **PWA** — installable as progressive web app
 - **Mobile-friendly** — safe-area insets, responsive

@@ -1,6 +1,6 @@
 {
   "name": "aegisai-next",
-  "version": "1.1.61",
+  "version": "1.1.62",
   "description": "AegisAI (next) - modular rebuild: local AI web UI with Ollama backend, privacy-first, no telemetry.",
   "private": true,
   "scripts": {
@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server.js",
+    "mcp": "node mcp-server.js",
     "test": "node --test tests/*.test.js",
     "lint": "eslint --config lint.config.js ."
   },

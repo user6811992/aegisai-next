@@ -146,3 +146,15 @@ Roadmap for **AegisAI (next)** — the local-first AI agent product at `github.c
 - Local Ollama-native recon agent (`pikpikcu/airecon`, `H-mmer/pentest-agents`, `awarexone/Agentic-Bug-Hunter`) — extends F1 with offline-first recon; feasibility medium.
 - Self-evolving memory/context DB (`volcengine/OpenViking`, `openmemind/memind`) — large scope distinct from the current storage layer; feasibility low-medium.
 - DiggerHQ `opencomputer-example-cve-swarm` — CVE reachability + dependency-only fixes; interesting F1×supply-chain crossover, feasibility medium.
+
+## F9 — MCP ecosystem interoperability (seeded 2026-11-22 from modelcontextprotocol/servers)
+
+**Source:** `modelcontextprotocol/servers` (92.2k★, active 2026-11-19) — official reference MCP servers: Everything, Fetch, Filesystem, Git, Memory, Sequential Thinking, Time. Repo is explicitly educational, not production-ready; license is mixed MIT/Apache-2.0 (docs CC-BY-4.0), so **do not copy server code** — integrate via the existing `@modelcontextprotocol/sdk` dependency instead.
+
+**Fit with existing code:** `server/integrations/rea.js` already implements a generic-enough stdio MCP client (Client + StdioClientTransport, `listTools`, `callTool`); `server/integrations/register.js` + `/api/agent` ext-tool gathering provide the wiring pattern; `server/core/security.js` (`validateProjectRoot`, `safePath`, `isSafeUrl`, `runProcess`) supplies guards.
+
+- [ ] F9-1 — Generic MCP client integration: config-driven stdio/streamable-HTTP servers, tools namespaced `mcp_<server>_<tool>`, registered as an external-tool source with the same budget/clean-room gating as `hunt_`/`rea_`. **Feasibility: high** (SDK present, REA client is a template).
+- [ ] F9-2 — Curated safe presets: Filesystem scoped to the configured project root, Git read-only, Fetch through `isSafeUrl`, Memory/Time/Sequential-Thinking. Allow-list server commands; no arbitrary shell. **Feasibility: medium-high** (argument validation is the real work).
+- [x] F9-3 landed — Expose AegisAI as an MCP server: `mcp-server.js` (stdio, `npm run mcp`) registers `aegisai_health`, `aegisai_agent`, `aegisai_hunt`, `aegisai_task`, `aegisai_swarm`; project root validated against `AEGISAI_PROJECT_ROOT_ALLOWLIST` before agent tools run; 2 new MCP client tests; suite 87/87 pass. README includes client config example.
+- [ ] F9-4 — MCP registry browser / install flow (registry.modelcontextprotocol.io). **Feasibility: medium**, largest trust/UX surface; defer until F9-1/3 land.
+- Parked: reusing the reference Memory knowledge-graph server duplicates our SQLite memory/RAG layer — **low priority**.

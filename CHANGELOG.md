@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.62] - 2026-11-22
+
+### Added
+- F9-3: `mcp-server.js` exposes AegisAI as a stdio MCP server (`npm run mcp`) with `aegisai_health`, `aegisai_agent`, `aegisai_hunt`, `aegisai_task` and `aegisai_swarm` tools. Agent tools require a valid `AEGISAI_PROJECT_ROOT` within the configured allow-list. README includes an MCP client config example.
+
 ## [1.1.61] - 2026-11-22
 
 ### Changed
