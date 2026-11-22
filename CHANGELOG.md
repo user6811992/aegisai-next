@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.55] - 2026-11-22
+
+### Fixed
+- Approval gate polling timer no longer releases the event loop while a decision is pending; this fixes CI test cancellation on Linux runners.
+
 ## [1.1.54] - 2026-11-21
 
 ### Added

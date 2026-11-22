@@ -51,7 +51,9 @@ function createApprovalGate(opts = {}) {
           resolve(false);
         }
       }, pollMs);
-      if (typeof timer.unref === 'function') timer.unref();
+      // Do NOT unref: a pending approval must keep the event loop alive so the
+      // polling loop can observe a decision (unref'd timers let CI's test
+      // runner exit with "Promise resolution is still pending").
     });
   }
 
