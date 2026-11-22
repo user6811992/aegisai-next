@@ -9,9 +9,13 @@
 
 const path = require('path');
 const intConfig = require('../storage/integrations-config');
+const security = require('../core/security');
 
 const SEP = '__';
 const ALLOWED_COMMANDS = new Set(['npx', 'uvx', 'node', 'python', 'python3']);
+const WRITE_TOOL = /(write|edit|create|delete|remove|commit|push|reset|checkout|move|rename|apply|stage|init)/i;
+const URL_ARGS = ['url', 'target', 'endpoint', 'href', 'link'];
+const PATH_ARGS = ['path', 'paths', 'file_path', 'directory', 'source', 'destination'];
 let initPromise = null;
 let entries = new Map();
 
@@ -69,7 +73,8 @@ async function init() {
         await client.connect(transport);
         const res = await client.listTools();
         entry.client = client;
-        entry.tools = (res.tools || []).map((t) => ({
+        const discovered = (res.tools || []).filter((t) => !(spec.readOnly && WRITE_TOOL.test(String(t.name))));
+        entry.tools = discovered.map((t) => ({
           name: spec.id + SEP + t.name,
           description: t.description || (spec.id + ' / ' + t.name),
           inputSchema: t.inputSchema || { type: 'object', properties: {} },
@@ -98,6 +103,25 @@ function tools() {
   return out;
 }
 
+function validateToolArgs(args, entry) {
+  const a = args && typeof args === 'object' ? args : {};
+  for (const key of URL_ARGS) {
+    const v = a[key];
+    if (typeof v === 'string' && v.trim() && !security.isSafeUrl(v)) {
+      throw new Error('MCP tool blocked: unsafe ' + key);
+    }
+  }
+  const root = entry && entry.spec && entry.spec.scopeRoot;
+  if (root) {
+    for (const key of PATH_ARGS) {
+      const v = a[key];
+      if (typeof v === 'string' && v.trim()) security.safePath(root, v);
+      if (Array.isArray(v)) for (const p of v) if (typeof p === 'string' && p.trim()) security.safePath(root, p);
+    }
+  }
+  return a;
+}
+
 async function callTool(name, args) {
   await init();
   const idx = String(name || '').indexOf(SEP);
@@ -106,7 +130,8 @@ async function callTool(name, args) {
   const toolName = name.slice(idx + SEP.length);
   const entry = entries.get(id);
   if (!entry || !entry.client) throw new Error('MCP server not available: ' + id + (entry && entry.error ? ' (' + entry.error + ')' : ''));
-  const res = await entry.client.callTool({ name: toolName, arguments: args || {} });
+  const safeArgs = validateToolArgs(args, entry);
+  const res = await entry.client.callTool({ name: toolName, arguments: safeArgs });
   return res;
 }
 
@@ -131,4 +156,4 @@ async function closeAll() {
 
 const integration = { name: 'mcp', isAvailable, tools, status, callTool, init, closeAll };
 
-module.exports = { integration, init, callTool, closeAll, validSpec, SEP };
+module.exports = { integration, init, callTool, closeAll, validSpec, validateToolArgs, SEP };

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.64] - 2026-11-22
+
+### Added
+- F9-2: curated safe presets for the official MCP reference servers. `POST /api/integrations/mcp/presets` installs pinned configs for fs/git/fetch/memory/seq/time. Filesystem is scoped to the validated project root, Git tools are filtered to read-only names, and every MCP tool call re-checks URL/path arguments against the SSRF and path-traversal guards.
+
 ## [1.1.63] - 2026-11-22
 
 ### Added

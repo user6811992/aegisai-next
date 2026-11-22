@@ -57,6 +57,7 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
   { "mcpServers": [{ "id": "fs", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:/allowed"] }] }
   ```
   On Windows use `"command": "cmd", "args": ["/c", "npx", ...]`. Only `npx`, `uvx`, `node`, `python`/`python3` (or absolute paths to those executables) are accepted; no arbitrary shell commands.
+- **Curated presets** — `POST /api/integrations/mcp/presets` with `{"presets":["fs","git","fetch","memory","seq","time"],"root":"<project>"}` installs safe configurations for the official reference servers. Filesystem is pinned to the validated project root, Git tools are filtered to read-only names, and every MCP tool call has its URL/path arguments re-checked against the SSRF/path guards.
 - **Pending actions** — human-in-the-loop approve/reject
 - **Version checking** — check AegisAI, Node, Ollama, REA versions
 - **Error log viewer** — view server error log

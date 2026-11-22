@@ -287,6 +287,22 @@ const server = http.createServer(async (req, res) => {
         return json(res, 500, { ok: false, error: String(e.message || e) });
       }
     }
+    if (url === '/api/integrations/mcp/presets' && req.method === 'POST') {
+      if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(res, 400, { ok: false, error: 'bad json' }); }
+      try {
+        const presets = require('./server/integrations/mcp-presets');
+        const specs = presets.buildPresets(body.presets, body.root || getProjectRoot());
+        const cfg = intConfig.load();
+        const existing = Array.isArray(cfg.mcpServers) ? cfg.mcpServers.filter((s) => !(s && typeof s.id === 'string' && s.id.startsWith('preset-'))) : [];
+        cfg.mcpServers = existing.concat(specs);
+        intConfig.save(cfg);
+        return json(res, 200, { ok: true, servers: specs.map((s) => ({ id: s.id, description: s.description, readOnly: !!s.readOnly, scopeRoot: s.scopeRoot || null })) });
+      } catch (e) {
+        return json(res, e.status || 400, { ok: false, error: e.message || String(e) });
+      }
+    }
     if (url === '/api/integrations/status' && req.method === 'GET') {
       if (!checkAuth(req)) { res.statusCode = 401; res.end('unauthorized'); return; }
       return json(res, 200, await integrations.registry.statusAll());
