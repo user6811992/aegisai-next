@@ -120,6 +120,41 @@ function open(dbPath) {
     function v3() {
       try { db.exec('ALTER TABLE chats ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0'); } catch (e) { /* already exists */ }
     },
+    // v4: durable always-on runtime (inbox/outbox)
+    function v4() {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS runtime_sessions (
+          id TEXT PRIMARY KEY,
+          goal TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'idle',
+          policy TEXT NOT NULL DEFAULT '{}',
+          created INTEGER NOT NULL,
+          last_result TEXT
+        );
+        CREATE TABLE IF NOT EXISTS runtime_jobs (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          goal TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'queued',
+          payload TEXT NOT NULL DEFAULT '{}',
+          result TEXT,
+          error TEXT,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          created INTEGER NOT NULL,
+          FOREIGN KEY (session_id) REFERENCES runtime_sessions(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_runtime_jobs_session ON runtime_jobs(session_id);
+        CREATE TABLE IF NOT EXISTS runtime_outbox (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT,
+          job_id TEXT,
+          type TEXT NOT NULL,
+          payload TEXT NOT NULL DEFAULT '{}',
+          created INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_runtime_outbox_session ON runtime_outbox(session_id);
+      `);
+    },
   ];
   for (let i = currentVersion; i < migrations.length; i++) {
     migrations[i]();
@@ -309,7 +344,7 @@ function migrateFromJson(dataDir) {
   }
 }
 
-module.exports = { open, get, isOpen, close, migrateFromJson, backend,
+module.exports = { open, get, isOpen, close, migrateFromJson, backend, one, all, run,
   listChats, getChat, saveChat, deleteChat, listBranches, chatCount,
   listMemories, getMemory, saveMemory, deleteMemory, memoryCount,
   listSkills, getSkill, saveSkill, deleteSkill,

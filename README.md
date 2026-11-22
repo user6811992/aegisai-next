@@ -24,6 +24,15 @@ This is the **next-generation** codebase — a ground-up modular rebuild of [Aeg
 - **Web search** — DuckDuckGo integration
 - **Voice** — speech-to-text (mic) and text-to-speech (speaker) via Web Speech API
 
+### Agent Orchestration & Evaluation
+- **Bug-hunting pipeline** — bug-hunting skill, disclosed-vulnerability pattern library, `hunt` tools (`hunt_start`, `hunt_vuln_search`, `hunt_report`), wave orchestration and persisted reports
+- **Long-horizon tasks** — goal → plan → execute → verify → deliver phase driver with sandbox URL/target guards
+- **Swarm orchestration** — fan-out across subtasks with per-subtask retry, cancellation/timeout and tool-budget overrides
+- **Always-on runtime** — persistent sessions with a durable SQLite inbox/outbox, restart restore, per-session isolation policy, approval gates for high-risk jobs, and interval/one-shot timers
+- **Delivery channels** — in-memory event stream and SSRF-guarded webhook fan-out for runtime lifecycle events
+- **Speed benchmark** — repeat tasks through the local agent and report median latency/success rate as Markdown or JSON
+- **Always-on evaluation** — HALO-style Sensing/Memory/Action connectivity checks with a with/without-learning ablation
+
 ### Memory & Skills
 - **Memory panel** — add/delete durable facts with embedding search (RAG)
 - **Memory auto-extract** — LLM extracts facts from conversations
@@ -168,6 +177,10 @@ npm run build    # Build to public/
 npm start        # Start server
 npm test         # Run tests
 ```
+
+Programmatic helpers are exported from `server.js` for integrations: `runAgent`, `runHunt`, `task`, `swarm`, `createRuntime`, `restoreRuntime`, `createDelivery`, `createEventChannel`, `createWebhookChannel`, `createRuntimeApprovalGate`, `createTimerScheduler`, `runBenchmark`, `createLocalAgentRunner`, `exportReport` and `evaluateAlwaysOn`.
+
+See `aegisai_next_roadmap.md` for the feature roadmap and milestone status.
 
 ## License
 

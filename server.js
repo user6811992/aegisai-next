@@ -14,6 +14,14 @@ if (!global.__aegisDbOpened) {
 setTimeout(() => { try { require('./server/storage/default-skills').ensureDefaultSkills(); } catch (e) { console.error('Skill seed failed:', e.message); } }, 3000);
 const backends = require('./server/backends');
 const agent = require('./server/agent/run');
+const task = require('./server/agent/task');
+const swarm = require('./server/agent/swarm');
+const runtime = require('./server/runtime/always-on');
+const delivery = require('./server/runtime/delivery');
+const speedbench = require('./server/eval/speedbench');
+const durable = require('./server/runtime/durable');
+const timers = require('./server/runtime/timers');
+const alwaysOnEval = require('./server/eval/always-on-eval');
 const coding = require('./server/tools/coding');
 const integrations = require('./server/integrations/register');
 const capabilities = require('./server/core/capabilities');
@@ -33,6 +41,16 @@ let projectRoot = null;
 // Pending actions (human-in-the-loop)
 const pendingActions = [];
 function queueAction(action) { const a = { id: 'pa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), status: 'pending', created: new Date().toISOString(), ...action }; pendingActions.push(a); return a; }
+
+// Approval gate shared with the always-on runtime; decisions made through
+// /api/pending-actions/approve|reject mutate the same action objects.
+function createRuntimeApprovalGate() {
+  const approval = require('./server/runtime/approval');
+  return approval.createApprovalGate({
+    queueAction,
+    getAction: (id) => pendingActions.find((x) => x.id === id) || null,
+  });
+}
 
 function getProjectRoot() { return projectRoot; }
 function setProjectRoot(root) { projectRoot = root; }
@@ -345,13 +363,14 @@ const server = http.createServer(async (req, res) => {
       }
       // Gather external tools from available integrations.
       const avail = await integrations.registry.available();
-      const ext = { ghidra: [], craft: [], are: [], rea: [] };
+      const ext = { ghidra: [], craft: [], are: [], rea: [], hunt: [] };
       for (const i of avail) {
         const ts = (typeof i.tools === 'function') ? i.tools() : [];
         if (i.name === 'ghidra') ext.ghidra = ts;
         else if (i.name === 'craft') ext.craft = ts;
         else if (i.name === 'awesome-re') ext.are = ts;
         else if (i.name === 'rea') ext.rea = ts;
+        else if (i.name === 'hunt') ext.hunt = ts;
       }
       // REA tools namespaced as rea_ in agent; map them into ext.rea (already).
       const reqBudget = parseInt(body.toolBudget, 10);
@@ -369,7 +388,7 @@ const server = http.createServer(async (req, res) => {
         ? AbortSignal.any([controller.signal, AbortSignal.timeout(30 * 60 * 1000)])
         : controller.signal;
       try {
-        const result = await agent.runAgent({
+        const baseAgentOpts = {
           model: body.model,
           messages: body.messages || [],
           projectRoot: projectRoot,
@@ -385,7 +404,15 @@ const server = http.createServer(async (req, res) => {
           maxTokens,
           onEvent: (e) => send(e),
           signal,
-        });
+        };
+        const swarmSubs = (body.swarm && Array.isArray(body.swarm.subtasks)) ? body.swarm.subtasks : ((body.swarm && Array.isArray(body.swarm.plan)) ? body.swarm.plan : null);
+        const result = (swarmSubs)
+          ? await swarm.runSwarm({ ...baseAgentOpts, subtasks: swarmSubs, perTask: (body.swarm && body.swarm.perTask) || undefined, maxWaves: (body.swarm && typeof body.swarm.maxWaves === 'number' && body.swarm.maxWaves > 0) ? body.swarm.maxWaves : 1, timeoutMs: (body.swarm && typeof body.swarm.timeoutMs === 'number' && body.swarm.timeoutMs > 0) ? body.swarm.timeoutMs : undefined })
+          : (body.task && body.task.goal)
+          ? await task.runTask({ ...baseAgentOpts, goal: body.task.goal, context: body.task.context })
+          : (body.hunt && body.hunt.target)
+            ? await agent.runHunt({ ...baseAgentOpts, target: body.hunt.target, scope: body.hunt.scope, maxWaves: (typeof body.hunt.maxWaves === 'number' && body.hunt.maxWaves > 0) ? body.hunt.maxWaves : 3 })
+            : await agent.runAgent(baseAgentOpts);
         send({ type: 'done', ok: true, final: result.final.final, thinking: result.final.thinking || '', toolLog: result.toolLog, tokenStats: result.final.tokenStats || null });
       } catch (e) {
         send({ type: 'error', ok: false, error: String(e && e.message ? e.message : e) });
@@ -1259,6 +1286,20 @@ module.exports = {
   isValidModelName: security.isValidModelName,
   isSafeUrl: security.isSafeUrl,
   runAgent: agent.runAgent,
+  runHunt: agent.runHunt,
+  task: task.runTask,
+  swarm: swarm.runSwarm,
+  createRuntime: runtime.createRuntime,
+  createDelivery: delivery.createDelivery,
+  createEventChannel: delivery.createEventChannel,
+  createWebhookChannel: delivery.createWebhookChannel,
+  runBenchmark: speedbench.runBenchmark,
+  createLocalAgentRunner: speedbench.createLocalAgentRunner,
+  exportReport: speedbench.exportReport,
+  restoreRuntime: durable.restoreRuntime,
+  createRuntimeApprovalGate,
+  createTimerScheduler: timers.createTimerScheduler,
+  evaluateAlwaysOn: alwaysOnEval.evaluateAlwaysOn,
   isCleanRoomBlocked: agent.isCleanRoomBlocked,
   backends,
   coding,

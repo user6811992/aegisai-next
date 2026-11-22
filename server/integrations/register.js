@@ -5,6 +5,7 @@ const voice = require('./voice');
 const ghidra = require('./ghidra');
 const craft = require('./craft');
 const awesomeRe = require('./awesome-re');
+const hunt = require('./hunt');
 
 function registerAll() {
   registry.register(rea.integration);
@@ -12,6 +13,7 @@ function registerAll() {
   registry.register(ghidra.integration);
   registry.register(craft.integration);
   registry.register(awesomeRe.integration);
+  registry.register(hunt.integration);
 }
 
 module.exports = { registerAll, registry };

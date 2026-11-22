@@ -11,6 +11,7 @@ const DEFAULT_SKILLS = [
   { name: 'android-re', description: 'Android reverse engineering methodology: APK decompilation, API extraction, Kotlin name recovery.', code: "print('Android RE: 1) Fingerprint APK. 2) Decompile with jadx. 3) Recover Kotlin names. 4) Extract API calls. 5) Trace call flows.')" },
   { name: 'ui-review', description: 'Review UI/UX for AI-generated patterns: gradients, nested cards, emoji icons, invented stats.', code: "print('UI review: 1) No unnecessary gradients. 2) No nested cards. 3) No emoji as icons. 4) Virtualized lists. 5) Native navigation.')" },
   { name: 'context-compress', description: 'Compress tool outputs, logs, files before they reach the LLM to reduce token usage.', code: "print('Context compression: 1) Truncate large outputs. 2) Summarize file contents. 3) Use squeeze tool. 4) Remove redundant context.')" },
+  { name: 'bug-hunting', description: 'Autonomous bug-hunting workflow: recon -> target discovery (dorking / awesome-re) -> probe (Burp/scanner / MCP) -> verify -> report. Enforces authorized testing and disclosed-pattern usage.', code: "print('Bug hunt workflow: 1) Recon target scope and map attack surface. 2) Discover prior art via are_search_reverse_engineered before probing. 3) Probe with safe scanners / MCP tools. 4) Verify PoC before reporting. 5) Report using disclosed vulnerability patterns.')" },
 ];
 
 function ensureDefaultSkills() {

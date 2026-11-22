@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.54] - 2026-11-21
+
+### Added
+- F1 autonomous bug-hunting pipeline: bug-hunting skill, disclosed-vulnerability pattern library, `hunt` integration (`hunt_start` / `hunt_vuln_search` / `hunt_report`), wave orchestration and report persistence.
+- F2 long-horizon task substrate: multi-phase task driver, task sandbox, and swarm orchestration with per-subtask retry policy, cancellation/timeout and budget propagation.
+- F6-1 always-on agent runtime: persistent sessions, per-session isolation policy, approval gates for high-risk jobs, interval/one-shot timers, and pluggable event/webhook delivery.
+- F8 durable state: SQLite-backed sessions, jobs and outbox with restart restore (migration v4).
+- F7 agent speed benchmark harness with a local-agent runner and markdown/JSON report export.
+- F8-4 HALO-style always-on evaluation: Sensing/Memory/Action connectivity checks and learning-gain ablation.
+- `aegisai_next_roadmap.md` plus 8 new test files (83 tests passing).
+
+### Changed
+- `server/storage/db.js`: export generic `one` / `all` / `run` SQL helpers for internal modules.
+- Expose new runtime and evaluation factories from `server.js` for integration use.
+
 ## [1.1.53] - 2026-11-21
 
 ### Changed

@@ -63,6 +63,7 @@ async function runAgent(opts) {
     for (const t of (externalTools.craft || [])) extDefs.push({ src: 'craft', tool: t });
     for (const t of (externalTools.are || [])) extDefs.push({ src: 'are', tool: t });
     for (const t of (externalTools.rea || [])) extDefs.push({ src: 'rea', tool: t });
+    for (const t of (externalTools.hunt || [])) extDefs.push({ src: 'hunt', tool: t });
   }
   for (const { src, tool } of extDefs) {
     tools.push({
@@ -80,7 +81,7 @@ async function runAgent(opts) {
 
   // budget trim: coding first, then externals
   if (tools.length > toolBudget) {
-    const external = (n) => n.startsWith('ghidra_') || n.startsWith('craft_') || n.startsWith('are_') || n.startsWith('rea_');
+    const external = (n) => n.startsWith('ghidra_') || n.startsWith('craft_') || n.startsWith('are_') || n.startsWith('rea_') || n.startsWith('hunt_');
     const codingTools = tools.filter((t) => !external(t.function.name));
     const externals = tools.filter((t) => external(t.function.name));
     const kept = [...codingTools];
@@ -154,7 +155,16 @@ async function runAgent(opts) {
       onEvent({ type: 'tool_call', name, args });
       let result;
       try {
-        if (name.startsWith('rea_')) {
+        if (name.startsWith('hunt_')) {
+          const toolName = name.slice(5);
+          const intg = integrations.registry.list().find((i) => i.name === 'hunt');
+          if (intg && typeof intg.callTool === 'function') {
+            const r = await intg.callTool(toolName, args);
+            result = { ok: true, output: JSON.stringify(r).slice(0, 2000) };
+          } else {
+            result = { ok: false, output: 'HUNT not available' };
+          }
+        } else if (name.startsWith('rea_')) {
           const toolName = name.slice(4);
           const intg = integrations.registry.list().find((i) => i.name === 'rea');
           if (intg && typeof intg.callTool === 'function') {
@@ -187,4 +197,74 @@ async function runAgent(opts) {
   return { final: { type: 'done', final: '(max iterations reached)', toolLog }, toolLog };
 }
 
-module.exports = { runAgent, isCleanRoomBlocked };
+const HUNT_PHASES = ['recon', 'probe', 'verify', 'report'];
+
+function huntPhasePrompt(phase, ctx) {
+  const target = (ctx && ctx.target) || 'the target';
+  const scope = (ctx && ctx.scope) || 'in-scope assets';
+  if (phase === 'recon') {
+    return 'HUNT_PHASE=recon. You are in the recon phase of a bug hunt against ' + target + ' (' + scope + '). Map the attack surface: enumerate endpoints, auth surfaces, inputs. Use are_search_reverse_engineered and hunt_vuln_search to find prior art. Goal: produce a candidate area list.';
+  }
+  if (phase === 'probe') {
+    return 'HUNT_PHASE=probe. You are in the probe phase of a bug hunt against ' + target + '. Take the top recon candidates and probe them with safe scanning / MCP tools; record suspected issues with evidence.';
+  }
+  if (phase === 'verify') {
+    return 'HUNT_PHASE=verify. You are in the verify phase of a bug hunt against ' + target + '. Prove each candidate with a concrete reproduction before reporting.';
+  }
+  if (phase === 'report') {
+    return 'HUNT_PHASE=report. You are in the report phase of a bug hunt against ' + target + '. Call the hunt_report tool with the verified findings and produce the final report.';
+  }
+  return 'HUNT_PHASE=' + phase + '. Continue the bug hunt against ' + target + '.';
+}
+
+async function runHunt(opts) {
+  const {
+    model, projectRoot, includeCoding = true, includeRe = false, cleanRoom = false,
+    toolBudget = 64, allowedTools, deniedTools, onEvent = () => {}, signal,
+    externalTools = { ghidra: [], craft: [], are: [], rea: [], hunt: [] },
+    fallbackModels = [], maxHistory = 20, maxTokens = 0,
+    target, scope, maxWaves = 3, phases: optPhases, phasePrompt, taskCtx = {}, messages: initialMessages = [],
+  } = opts;
+
+  const baseOpts = {
+    model, projectRoot, includeCoding, includeRe, cleanRoom, toolBudget, allowedTools, deniedTools,
+    onEvent, signal, externalTools, fallbackModels, maxHistory, maxTokens,
+  };
+
+  const phases = Array.isArray(optPhases) && optPhases.length > 0 ? optPhases : HUNT_PHASES;
+  const promptFor = typeof phasePrompt === 'function' ? phasePrompt : huntPhasePrompt;
+
+  const maxW = Math.max(1, maxWaves || 3);
+  const toolLog = [];
+  const waves = [];
+  let finalText = '(hunt did not run)';
+  let thinking = '';
+  const tokenStats = { prompt: 0, generated: 0 };
+
+  for (let wave = 0; wave < maxW; wave++) {
+    const phase = phases[Math.min(wave, phases.length - 1)];
+    const phaseCtx = { target, scope, ...taskCtx };
+    const phaseMessages = [
+      { role: 'system', content: promptFor(phase, phaseCtx) },
+      { role: 'user', content: 'Begin phase: ' + phase + (phaseCtx.goal ? ' (goal: ' + phaseCtx.goal + ')' : '') + '.' },
+    ];
+    if (Array.isArray(initialMessages)) phaseMessages.push(...initialMessages);
+    const res = await runAgent({ ...baseOpts, messages: phaseMessages });
+    finalText = (res.final && res.final.final) || '(no final)';
+    thinking = (res.final && res.final.thinking) || '';
+    const wl = Array.isArray(res.toolLog) ? res.toolLog : [];
+    for (const t of wl) toolLog.push(t);
+    const usedReport = wl.some((t) => String(t.name || '').startsWith('hunt_') && /report/i.test(String(t.name || '')));
+    waves.push({ phase, final: finalText, toolCount: wl.length, usedReport });
+    if (res.final && res.final.tokenStats) {
+      tokenStats.prompt += res.final.tokenStats.prompt || 0;
+      tokenStats.generated += res.final.tokenStats.generated || 0;
+    }
+    if (usedReport) break;
+  }
+
+  const finalResult = { type: 'done', final: finalText, thinking, toolLog, tokenStats };
+  return { final: finalResult, toolLog, waves };
+}
+
+module.exports = { runAgent, runHunt, isCleanRoomBlocked };
