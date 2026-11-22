@@ -66,6 +66,17 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
+// public/index.html is committed, but the hashed assets it references are
+// build output. Serving it without them produces a UI full of 404s, so fail
+// loudly instead (the installer aborts on the same condition).
+function frontendBuilt() {
+  try {
+    const assetsDir = path.join(PUBLIC_DIR, 'assets');
+    if (!fs.existsSync(assetsDir) || !fs.statSync(assetsDir).isDirectory()) return false;
+    return fs.readdirSync(assetsDir).some((f) => f.endsWith('.js'));
+  } catch (e) { return false; }
+}
+
 function serveStatic(req, res) {
   let urlPath;
   try { urlPath = decodeURIComponent(req.url.split('?')[0]); }
@@ -75,6 +86,13 @@ function serveStatic(req, res) {
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR + path.sep) && filePath !== path.join(PUBLIC_DIR, 'index.html')) {
     res.statusCode = 403; res.end('forbidden'); return;
+  }
+  if (filePath === path.join(PUBLIC_DIR, 'index.html') && !frontendBuilt()) {
+    res.statusCode = 503;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Retry-After', '60');
+    res.end('<!doctype html><meta charset="utf-8"><title>Frontend not built</title><p>The frontend has not been built. Run <code>npm run build</code> in the application directory, then reload.</p>');
+    return;
   }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.statusCode = 404; res.end('not found'); return; }

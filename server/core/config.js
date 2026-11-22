@@ -20,7 +20,7 @@ const TOOL_BUDGET = Math.max(1, parseInt(process.env.AEGISAI_TOOL_BUDGET || '64'
 
 const DATA_DIR = process.env.AEGISAI_DATA_DIR || path.join(process.cwd(), 'data');
 
-const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
+const PUBLIC_DIR = process.env.AEGISAI_PUBLIC_DIR || path.join(__dirname, '..', '..', 'public');
 
 module.exports = {
   PORT,

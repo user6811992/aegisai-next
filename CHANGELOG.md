@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.58] - 2026-11-22
+
+### Fixed
+- Installer build script now finds per-user Inno Setup 6 installations and passes the version from `package.json` to the `.iss` (issues #1, #2).
+- Launcher now finds Node.js/npm on `PATH` (nvm/scoop/winget/custom drives) and warns on Node versions below 22 (issue #3).
+- Installer now aborts when `npm install` or `npm run build` fails or when `public\assets\*.js` is missing; the server returns a clear 503 "frontend not built" page instead of a broken UI (issue #4). CI builds the frontend before tests.
+
 ## [1.1.57] - 2026-11-22
 
 ### Changed

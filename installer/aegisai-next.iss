@@ -3,7 +3,7 @@
 ; Requires: Inno Setup 6 (https://jrsoftware.org/isinfo.php)
 
 #define MyAppName "AegisAI (next)"
-#define MyAppVersion "1.1.53"
+#define MyAppVersion "1.1.58"
 #define MyAppPublisher "AegisAI"
 #define MyAppURL "https://github.com/user6811992/aegisai-next"
 #define MyAppExeName "launcher.vbs"
@@ -58,7 +58,7 @@ Source: "..\static\*"; DestDir: "{app}\static"; Flags: ignoreversion recursesubd
 Source: "..\vite.config.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\index.html"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\launcher.vbs"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\installer\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\installer\icon.ico"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: BuildFrontend
 
 [Dirs]
 Name: "{app}\data"; Flags: uninsneveruninstall
@@ -71,11 +71,49 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d "
 Name: "{userstartup}\{#MyAppName}"; Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; WorkingDir: "{app}"; IconFilename: "{app}\icon.ico"; Tasks: startupicon
 
 [Run]
-Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm install"; StatusMsg: "Installing npm dependencies..."; Flags: runhidden waituntilterminated
-Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm run build"; StatusMsg: "Building frontend..."; Flags: runhidden waituntilterminated
 Filename: "cmd.exe"; Parameters: "/c cd /d ""{app}"" && npm start"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [CustomMessages]
 LaunchProgram=Launch {#MyAppName}
 AdditionalIcons=Additional icons:
 CreateDesktopIcon=Create a &desktop icon
+
+[Code]
+procedure RunStepOrAbort(const Params, Description: string);
+var
+  ResultCode: Integer;
+begin
+  WizardForm.StatusLabel.Caption := Description;
+  if not Exec('cmd.exe', Params, ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) or
+     (ResultCode <> 0) then
+  begin
+    MsgBox(Description + ' failed with exit code ' + IntToStr(ResultCode) + '. Setup will abort.', mbError, MB_OK);
+    Abort;
+  end;
+end;
+
+procedure BuildFrontend;
+var
+  AssetsDir: string;
+  Find: TFindRec;
+  FoundJs: Boolean;
+begin
+  RunStepOrAbort('/c cd /d "{app}" && npm install', 'Installing npm dependencies...');
+  RunStepOrAbort('/c cd /d "{app}" && npm run build', 'Building frontend...');
+
+  { A failed Vite build can still leave the committed index.html behind. }
+  AssetsDir := ExpandConstant('{app}\public\assets');
+  FoundJs := False;
+  if DirExists(AssetsDir) and FindFirst(AddBackslash(AssetsDir) + '*.js', Find) then
+  begin
+    repeat
+      if (Find.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then FoundJs := True;
+    until (not FindNext(Find)) or FoundJs;
+    FindClose(Find);
+  end;
+  if not FoundJs then
+  begin
+    MsgBox('Frontend build did not produce public\assets\*.js. Setup will abort.', mbError, MB_OK);
+    Abort;
+  end;
+end;
